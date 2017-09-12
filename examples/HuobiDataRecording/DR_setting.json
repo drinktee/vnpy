@@ -1,0 +1,19 @@
+{
+    "working": true,
+
+    "tick":
+    [
+        ["BTCCNY", "HUOBI"],
+        ["LTCCNY", "HUOBI"]
+    ],
+
+    "bar":
+    [
+        ["BTCCNY", "HUOBI"],
+        ["LTCCNY", "HUOBI"]
+    ],
+
+    "active":
+    {
+    }
+}

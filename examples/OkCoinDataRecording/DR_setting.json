@@ -1,0 +1,21 @@
+{
+    "working": true,
+
+    "tick":
+    [
+        ["BTC_CNY_SPOT", "OKCOIN"],
+        ["LTC_CNY_SPOT", "OKCOIN"],
+        ["ETH_CNY_SPOT", "OKCOIN"]
+    ],
+
+    "bar":
+    [
+        ["BTC_CNY_SPOT", "OKCOIN"],
+        ["LTC_CNY_SPOT", "OKCOIN"],
+        ["ETH_CNY_SPOT", "OKCOIN"]
+    ],
+
+    "active":
+    {
+    }
+}
