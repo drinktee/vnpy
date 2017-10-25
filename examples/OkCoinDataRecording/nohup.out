@@ -1,3 +1,38 @@
 2017-09-10 09:52:59	启动行情记录守护父进程
 2017-09-10 09:52:59	启动子进程
 No handlers could be found for logger "websocket"
+2017-09-12 17:20:56	启动行情记录守护父进程
+2017-09-12 17:20:56	启动子进程
+No handlers could be found for logger "websocket"
+Exception in thread Thread-1:
+Traceback (most recent call last):
+  File "/home/foursking/anaconda2/lib/python2.7/threading.py", line 801, in __bootstrap_inner
+    self.run()
+  File "/home/foursking/anaconda2/lib/python2.7/threading.py", line 754, in run
+    self.__target(*self.__args, **self.__kwargs)
+  File "/home/foursking/anaconda2/lib/python2.7/site-packages/vnpy-1.7.0-py2.7.egg/vnpy/event/eventEngine.py", line 218, in __run
+    self.__process(event)
+  File "/home/foursking/anaconda2/lib/python2.7/site-packages/vnpy-1.7.0-py2.7.egg/vnpy/event/eventEngine.py", line 228, in __process
+    [handler(event) for handler in self.__handlers[event.type_]]
+  File "/home/foursking/anaconda2/lib/python2.7/site-packages/vnpy-1.7.0-py2.7.egg/vnpy/trader/gateway/okcoinGateway/okcoinGateway.py", line 227, in query
+    function()
+  File "/home/foursking/anaconda2/lib/python2.7/site-packages/vnpy-1.7.0-py2.7.egg/vnpy/trader/gateway/okcoinGateway/okcoinGateway.py", line 190, in qryAccount
+    self.api.spotUserInfo()
+  File "/home/foursking/anaconda2/lib/python2.7/site-packages/vnpy-1.7.0-py2.7.egg/vnpy/api/okcoin/vnokcoin.py", line 288, in spotUserInfo
+    self.sendTradingRequest(channel, {})
+  File "/home/foursking/anaconda2/lib/python2.7/site-packages/vnpy-1.7.0-py2.7.egg/vnpy/api/okcoin/vnokcoin.py", line 231, in sendTradingRequest
+    self.ws.send(j)
+  File "/home/foursking/anaconda2/lib/python2.7/site-packages/websocket/_app.py", line 118, in send
+    if not self.sock or self.sock.send(data, opcode) == 0:
+  File "/home/foursking/anaconda2/lib/python2.7/site-packages/websocket/_core.py", line 234, in send
+    return self.send_frame(frame)
+  File "/home/foursking/anaconda2/lib/python2.7/site-packages/websocket/_core.py", line 259, in send_frame
+    l = self._send(data)
+  File "/home/foursking/anaconda2/lib/python2.7/site-packages/websocket/_core.py", line 423, in _send
+    return send(self.sock, data)
+  File "/home/foursking/anaconda2/lib/python2.7/site-packages/websocket/_socket.py", line 116, in send
+    return sock.send(data)
+  File "/home/foursking/anaconda2/lib/python2.7/ssl.py", line 709, in send
+    v = self._sslobj.write(data)
+error: [Errno 110] Connection timed out
+

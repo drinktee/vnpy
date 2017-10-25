@@ -3,17 +3,18 @@
 
     "tick":
     [
-        ["BTCCNY", "HUOBI"],
-        ["LTCCNY", "HUOBI"]
+        ["BTCCNY.HUOBI", "HUOBI"],
+        ["LTCCNY.HUOBI", "HUOBI"]
     ],
 
     "bar":
     [
-        ["BTCCNY", "HUOBI"],
-        ["LTCCNY", "HUOBI"]
+        ["BTCCNY.HUOBI", "HUOBI"],
+        ["LTCCNY.HUOBI", "HUOBI"]
     ],
 
     "active":
     {
     }
 }
+

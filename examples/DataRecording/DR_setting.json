@@ -3,16 +3,28 @@
 
     "tick":
     [
+        ["au1712", "CTP"],
+        ["ag1801", "CTP"],
+	["rb1712", "CTP"],
+	["ru1712", "CTP"],
+	["SR711", "CTP"]
     ],
 
     "bar":
     [
-        ["BTC_CNY_SPOT", "OKCOIN"],
-        ["LTC_CNY_SPOT", "OKCOIN"],
-        ["ETH_CNY_SPOT", "OKCOIN"]
+        ["au1712", "CTP"],
+        ["ag1801", "CTP"],
+	["rb1712", "CTP"],
+	["ru1712", "CTP"],
+	["SR711", "CTP"]
     ],
 
     "active":
     {
+        "au0000": "au1712",
+        "bu0000": "ag1801",
+	"rb0000": "rb1712",
+	"ru0000": "ru1712",
+	"SR000": "SR711"
     }
 }
