@@ -10,6 +10,10 @@ from vnpy.trader.vtEngine import MainEngine
 from vnpy.trader.gateway import ctpGateway
 from vnpy.trader.app import dataRecorder
 
+import sys
+reload(sys)
+sys.setdefaultencoding('utf-8')
+
 #----------------------------------------------------------------------
 def printLog(content):
     """输出日志"""

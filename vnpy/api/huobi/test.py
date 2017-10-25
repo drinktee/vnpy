@@ -43,7 +43,7 @@ def testData():
     """测试行情接口"""
     api = DataApi()
     
-    api.init(0.5)
+    api.init(0.5, True)
     
     # 订阅成交推送，测试通过
     #api.subscribeTick(SYMBOL_BTCCNY)
@@ -52,10 +52,10 @@ def testData():
     #api.subscribeQuote(SYMBOL_BTCCNY)
 
     # 订阅深度推送，测试通过
-    #api.subscribeDepth(SYMBOL_BTCCNY, 1)
+    data = api.subscribeDepth(SYMBOL_BTCCNY, 1)
 
     # 查询K线数据，测试通过
-    data = api.getKline(SYMBOL_BTCCNY, PERIOD_1MIN, 100)
+    #data = api.getKline(SYMBOL_BTCCNY, PERIOD_1MIN, 100)
     print data
     
     input()

@@ -11,6 +11,10 @@ from vnpy.trader.gateway import ctpGateway
 from vnpy.trader.app import ctaStrategy
 from vnpy.trader.app.ctaStrategy.ctaBase import EVENT_CTA_LOG
 
+import sys
+reload(sys)
+sys.setdefaultencoding('utf-8')
+
 #----------------------------------------------------------------------
 def printLog(content):
     """输出日志"""

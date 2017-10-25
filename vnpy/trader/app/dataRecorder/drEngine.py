@@ -83,7 +83,6 @@ class DrEngine(object):
                 for setting in l:
                     symbol = setting[0]
                     vtSymbol = symbol
-
                     req = VtSubscribeReq()
                     req.symbol = setting[0]
 
@@ -226,11 +225,10 @@ class DrEngine(object):
         # 转化Tick格式
         if not tick.datetime:
             tick.datetime = datetime.strptime(' '.join([tick.date, tick.time]), '%Y%m%d %H:%M:%S.%f')            
-        
+       
         # 更新Tick数据
         if vtSymbol in self.tickDict:
             self.insertData(TICK_DB_NAME, vtSymbol, tick)
-            
             if vtSymbol in self.activeSymbolDict:
                 activeSymbol = self.activeSymbolDict[vtSymbol]
                 self.insertData(TICK_DB_NAME, activeSymbol, tick)

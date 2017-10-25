@@ -604,7 +604,7 @@ class HuobiDataApi(vnhuobi.DataApi):
         tick.askPrice5, tick.askVolume5 = data['asks'][4]
 
         now = datetime.now()
-        tick.time = now.strftime('%H:%M:%S')
+        tick.time = now.strftime('%H:%M:%S.%f')
         tick.date = now.strftime('%Y%m%d')
 
         self.gateway.onTick(tick)
