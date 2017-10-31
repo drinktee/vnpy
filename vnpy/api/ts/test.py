@@ -24,7 +24,7 @@ def testData():
 
     # 查询K线数据，测试通过
     #data = api.getKline(SYMBOL_BTCCNY, PERIOD_1MIN, 100)
-    print data
+    #print data
 
     input()
 

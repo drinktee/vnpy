@@ -45,14 +45,12 @@ class DataApi(object):
     def run(self):
         """连续运行"""
         while self.active:
-            for url, callback in self.taskList:
+            for symbol, callback in self.taskList:
                 try:
-                    r = requests.get(url)
-                    if r.status_code == 200:
-                        data = r.json()
-                        if self.DEBUG:
-                            print callback.__name__
-                        callback(data)
+                    df = ts.get_realtime_quotes('000581')
+                    if self.DEBUG:
+                        print callback.__name__
+                    callback(df)
                 except Exception, e:
                     print e
 
@@ -65,6 +63,27 @@ class DataApi(object):
         self.taskList.append(task)
 
     #----------------------------------------------------------------------
+    def subscribeQuote(self, symbol):
+        """订阅实时报价数据"""
+        task = (symbol, self.onQuote)
+        self.taskList.append(task)
+
+    def subscribeDepth(self, symbol):
+        """订阅深度数据"""
+        task = (symbol, self.onDepth)
+        self.taskList.append(task)
+
+    #----------------------------------------------------------------------
     def onTick(self, data):
         """实时成交推送"""
+        print data
+
+    #----------------------------------------------------------------------
+    def onQuote(self, data):
+        """实时报价推送"""
+        print data
+
+    #----------------------------------------------------------------------
+    def onDepth(self, data):
+        """实时深度推送"""
         print data
