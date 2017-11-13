@@ -272,7 +272,6 @@ class BacktestingEngine(object):
 
         self.output(u'开始回放数据')
 
-
         for i in range(self.dataLength):
             datas = {}
             for symbol in self.symbol:
@@ -287,25 +286,36 @@ class BacktestingEngine(object):
     def newBar(self, bar):
         """新的K线"""
         self.bar = bar
-        self.dt = bar.datetime
+        self.dt = datetime(1990, 0, 0)
+        for symbol in self.symbols:
+            # get largest datetime
+            if bar[symbol].datetime > self.dt:
+                self.dt = bar[symbol].datetime
 
         self.crossLimitOrder()      # 先撮合限价单
         self.crossStopOrder()       # 再撮合停止单
         self.strategy.onBar(bar)    # 推送K线到策略中
 
-        self.updateDailyClose(bar.datetime, bar.close)
+        for symbol in self.symbols:
+            self.updateDailyClose(bar[symbol].datetime, symbol, bar[symbol].close)
 
     #----------------------------------------------------------------------
     def newTick(self, tick):
         """新的Tick"""
         self.tick = tick
-        self.dt = tick.datetime
+        self.dt = datetime(1990, 0, 0)
+        for symbol in self.symbols:
+            # get largest datetime
+            if tick[symbol].datetime > self.dt:
+                self.dt = tick[symbol].datetime
 
         self.crossLimitOrder()
         self.crossStopOrder()
         self.strategy.onTick(tick)
 
-        self.updateDailyClose(tick.datetime, tick.lastPrice)
+        for symbol in self.symbols:
+            self.updateDailyClose(tick[symbol].datetime, symbol, tick[symbol].lastPrice)
+
 
     #----------------------------------------------------------------------
     def initStrategy(self, strategyClass, setting=None):
@@ -319,17 +329,22 @@ class BacktestingEngine(object):
     #----------------------------------------------------------------------
     def crossLimitOrder(self):
         """基于最新数据撮合限价单"""
+        buyCrossPrice = {}
+        sellCrossPrice = {}
+        buyBestCrossPrice = {}
+        sellBestCrossPrice = {}
         # 先确定会撮合成交的价格
-        if self.mode == self.BAR_MODE:
-            buyCrossPrice = self.bar.low        # 若买入方向限价单价格高于该价格，则会成交
-            sellCrossPrice = self.bar.high      # 若卖出方向限价单价格低于该价格，则会成交
-            buyBestCrossPrice = self.bar.open   # 在当前时间点前发出的买入委托可能的最优成交价
-            sellBestCrossPrice = self.bar.open  # 在当前时间点前发出的卖出委托可能的最优成交价
-        else:
-            buyCrossPrice = self.tick.askPrice1
-            sellCrossPrice = self.tick.bidPrice1
-            buyBestCrossPrice = self.tick.askPrice1
-            sellBestCrossPrice = self.tick.bidPrice1
+        for symbol in self.symbols:
+            if self.mode == self.BAR_MODE:
+                buyCrossPrice[symbol] = self.bar[symbol].low        # 若买入方向限价单价格高于该价格，则会成交
+                sellCrossPrice[symbol] = self.bar[symbol].high      # 若卖出方向限价单价格低于该价格，则会成交
+                buyBestCrossPrice[symbol] = self.bar[symbol].open   # 在当前时间点前发出的买入委托可能的最优成交价
+                sellBestCrossPrice[symbol] = self.bar[symbol].open  # 在当前时间点前发出的卖出委托可能的最优成交价
+            else:
+                buyCrossPrice[symbol] = self.tick[symbol].askPrice1
+                sellCrossPrice[symbol] = self.tick[symbol].bidPrice1
+                buyBestCrossPrice[symbol] = self.tick[symbol].askPrice1
+                sellBestCrossPrice[symbol] = self.tick[symbol].bidPrice1
 
         # 遍历限价单字典中的所有限价单
         for orderID, order in self.workingLimitOrderDict.items():
@@ -339,13 +354,14 @@ class BacktestingEngine(object):
                 self.strategy.onOrder(order)
 
             # 判断是否会成交
+            orderSymbol = order.vtSymbol
             buyCross = (order.direction==DIRECTION_LONG and
-                        order.price>=buyCrossPrice and
-                        buyCrossPrice > 0)      # 国内的tick行情在涨停时askPrice1为0，此时买无法成交
+                        order.price>=buyCrossPrice[orderSymbol] and
+                        buyCrossPrice[orderSymbol] > 0)      # 国内的tick行情在涨停时askPrice1为0，此时买无法成交
 
             sellCross = (order.direction==DIRECTION_SHORT and
-                         order.price<=sellCrossPrice and
-                         sellCrossPrice > 0)    # 国内的tick行情在跌停时bidPrice1为0，此时卖无法成交
+                         order.price<=sellCrossPrice[orderSymbol] and
+                         sellCrossPrice[orderSymbol] > 0)    # 国内的tick行情在跌停时bidPrice1为0，此时卖无法成交
 
             # 如果发生了成交
             if buyCross or sellCross:
@@ -366,11 +382,11 @@ class BacktestingEngine(object):
                 # 2. 假设在上一根K线结束(也是当前K线开始)的时刻，策略发出的委托为限价105
                 # 3. 则在实际中的成交价会是100而不是105，因为委托发出时市场的最优价格是100
                 if buyCross:
-                    trade.price = min(order.price, buyBestCrossPrice)
-                    self.strategy.pos += order.totalVolume
+                    trade.price = min(order.price, buyBestCrossPrice[orderSymbol])
+                    self.strategy.pos[orderSymbol] += order.totalVolume
                 else:
-                    trade.price = max(order.price, sellBestCrossPrice)
-                    self.strategy.pos -= order.totalVolume
+                    trade.price = max(order.price, sellBestCrossPrice[orderSymbol])
+                    self.strategy.pos[orderSymbol] -= order.totalVolume
 
                 trade.volume = order.totalVolume
                 trade.tradeTime = self.dt.strftime('%H:%M:%S')
@@ -391,20 +407,26 @@ class BacktestingEngine(object):
     def crossStopOrder(self):
         """基于最新数据撮合停止单"""
         # 先确定会撮合成交的价格，这里和限价单规则相反
-        if self.mode == self.BAR_MODE:
-            buyCrossPrice = self.bar.high    # 若买入方向停止单价格低于该价格，则会成交
-            sellCrossPrice = self.bar.low    # 若卖出方向限价单价格高于该价格，则会成交
-            bestCrossPrice = self.bar.open   # 最优成交价，买入停止单不能低于，卖出停止单不能高于
-        else:
-            buyCrossPrice = self.tick.lastPrice
-            sellCrossPrice = self.tick.lastPrice
-            bestCrossPrice = self.tick.lastPrice
+        buyCrossPrice = {}
+        sellCrossPrice = {}
+        bestCrossPrice = {}
+
+        for symbol in self.symbols:
+            if self.mode == self.BAR_MODE:
+                buyCrossPrice[symbol] = self.bar[symbol].high    # 若买入方向停止单价格低于该价格，则会成交
+                sellCrossPrice[symbol] = self.bar[symbol].low    # 若卖出方向限价单价格高于该价格，则会成交
+                bestCrossPrice[symbol] = self.bar[symbol].open   # 最优成交价，买入停止单不能低于，卖出停止单不能高于
+            else:
+                buyCrossPrice[symbol] = self.tick[symbol].lastPrice
+                sellCrossPrice[symbol] = self.tick[symbol].lastPrice
+                bestCrossPrice[symbol] = self.tick[symbol].lastPrice
 
         # 遍历停止单字典中的所有停止单
         for stopOrderID, so in self.workingStopOrderDict.items():
             # 判断是否会成交
-            buyCross = so.direction==DIRECTION_LONG and so.price<=buyCrossPrice
-            sellCross = so.direction==DIRECTION_SHORT and so.price>=sellCrossPrice
+            symbol = so.vtSymbol
+            buyCross = so.direction==DIRECTION_LONG and so.price<=buyCrossPrice[symbol]
+            sellCross = so.direction==DIRECTION_SHORT and so.price>=sellCrossPrice[symbol]
 
             # 如果发生了成交
             if buyCross or sellCross:
@@ -422,11 +444,11 @@ class BacktestingEngine(object):
                 trade.vtTradeID = tradeID
 
                 if buyCross:
-                    self.strategy.pos += so.volume
-                    trade.price = max(bestCrossPrice, so.price)
+                    self.strategy.pos[symbol] += so.volume
+                    trade.price = max(bestCrossPrice[symbol], so.price)
                 else:
-                    self.strategy.pos -= so.volume
-                    trade.price = min(bestCrossPrice, so.price)
+                    self.strategy.pos[symbol] -= so.volume
+                    trade.price = min(bestCrossPrice[symbol], so.price)
 
                 self.limitOrderCount += 1
                 orderID = str(self.limitOrderCount)
@@ -709,18 +731,22 @@ class BacktestingEngine(object):
                                 pass
 
         # 到最后交易日尚未平仓的交易，则以最后价格平仓
-        if self.mode == self.BAR_MODE:
-            endPrice = self.bar.close
-        else:
-            endPrice = self.tick.lastPrice
+        endPrice = {}
+        for symbol in self.symbols:
+            if self.mode == self.BAR_MODE:
+                endPrice[symbol] = self.bar[symbol].close
+            else:
+                endPrice[symbol] = self.tick[symbol].lastPrice
 
         for trade in longTrade:
-            result = TradingResult(trade.price, trade.dt, endPrice, self.dt,
+            symbol = trade.vtSymbol
+            result = TradingResult(trade.price, trade.dt, endPrice[symbol], self.dt,
                                    trade.volume, self.rate, self.slippage, self.size)
             resultList.append(result)
 
         for trade in shortTrade:
-            result = TradingResult(trade.price, trade.dt, endPrice, self.dt,
+            symbol = trade.vtSymbol
+            result = TradingResult(trade.price, trade.dt, endPrice[symbol], self.dt,
                                    -trade.volume, self.rate, self.slippage, self.size)
             resultList.append(result)
 
@@ -944,14 +970,14 @@ class BacktestingEngine(object):
             self.output(u'%s: %s' %(result[0], result[1]))
 
     #----------------------------------------------------------------------
-    def updateDailyClose(self, dt, price):
+    def updateDailyClose(self, dt, symbol, price):
         """更新每日收盘价"""
         date = dt.date()
 
         if date not in self.dailyResultDict:
-            self.dailyResultDict[date] = DailyResult(date, price)
+            self.dailyResultDict[date][symbol] = DailyResult(date, price)
         else:
-            self.dailyResultDict[date].closePrice = price
+            self.dailyResultDict[date][symbol].closePrice = price
 
     #----------------------------------------------------------------------
     def calculateDailyResult(self):
