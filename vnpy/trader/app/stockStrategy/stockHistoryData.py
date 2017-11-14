@@ -1,24 +1,18 @@
 __author__ = 'foursking'
 # encoding: UTF-8
 
-"""
-本模块中主要包含：
-1. 从通联数据下载历史行情的引擎
-2. 用来把MultiCharts导出的历史数据载入到MongoDB中用的函数
-3. 增加从通达信导出的历史数据载入到MongoDB中的函数
-"""
-
 from datetime import datetime, timedelta
 from time import time
 from multiprocessing.pool import ThreadPool
 
 import pymongo
 
+import tushare as ts
 from vnpy.data.datayes import DatayesApi
 from vnpy.trader.vtGlobal import globalSetting
 from vnpy.trader.vtConstant import *
 from vnpy.trader.vtObject import VtBarData
-from .ctaBase import SETTING_DB_NAME, TICK_DB_NAME, MINUTE_DB_NAME, DAILY_DB_NAME
+from .stockBase import SETTING_DB_NAME, TICK_DB_NAME, MINUTE_DB_NAME, DAILY_DB_NAME
 
 
 # 以下为vn.trader和通联数据规定的交易所代码映射
@@ -28,6 +22,56 @@ VT_TO_DATAYES_EXCHANGE[EXCHANGE_SHFE] = 'XSGE'      # 上期所
 VT_TO_DATAYES_EXCHANGE[EXCHANGE_CZCE] = 'XZCE'       # 郑商所
 VT_TO_DATAYES_EXCHANGE[EXCHANGE_DCE] = 'XDCE'       # 大商所
 DATAYES_TO_VT_EXCHANGE = {v:k for k,v in VT_TO_DATAYES_EXCHANGE.items()}
+
+
+class HistoryDataEngineV2(object):
+    """CTA模块用的历史数据引擎"""
+
+    #----------------------------------------------------------------------
+    def __init__(self):
+        self.dbClient = pymongo.MongoClient(globalSetting['mongoHost'], globalSetting['mongoPort'])
+
+    #---------------------------------------------------------------------
+    def lastTradeDate(self):
+        """获取最近交易日（只考虑工作日，无法检查国内假期）"""
+        today = datetime.now()
+        oneday = timedelta(1)
+
+        if today.weekday() == 5:
+            today = today - oneday
+        elif today.weekday() == 6:
+            today = today - oneday*2
+
+        return today.strftime('%Y%m%d')
+
+    def readStockProductSymbol(self):
+        """查询所有期货产品代码"""
+        cx = self.dbClient[SETTING_DB_NAME]['FuturesSymbol'].find()
+        return set([d['productSymbol'] for d in cx])    # 这里返回的是集合（因为会重复）
+
+    #----------------------------------------------------------------------
+    def downloadFuturesSymbol(self, tradeDate=''):
+        """下载所有期货的代码"""
+        if not tradeDate:
+            tradeDate = self.lastTradeDate()
+
+        self.dbClient[SETTING_DB_NAME]['StockSymbol'].ensure_index([('symbol', pymongo.ASCENDING)],
+                                                                       unique=True)
+        data = ts.get_concept_classified()
+
+        if data:
+            for d in data:
+                symbolDict = {}
+                symbolDict['symbol'] = d['code']
+                symbolDict['name'] = d['name']
+                symbolDict['c_name'] = d['c_name']
+                flt = {'symbol': d['code']}
+
+                self.dbClient[SETTING_DB_NAME]['StockSymbol'].update_one(flt, {'$set':symbolDict},
+                                                                           upsert=True)
+            print u'期货合约代码下载完成'
+        else:
+            print u'期货合约代码下载失败'
 
 
 ########################################################################
@@ -73,8 +117,6 @@ class HistoryDataEngine(object):
 
         self.dbClient[SETTING_DB_NAME]['FuturesSymbol'].ensure_index([('symbol', pymongo.ASCENDING)],
                                                                        unique=True)
-
-
         path = 'api/market/getMktMFutd.json'
 
         params = {}
@@ -230,6 +272,7 @@ class HistoryDataEngine(object):
         else:
             print u'找不到合约%s' %symbol
 
+
     #----------------------------------------------------------------------
     def downloadEquitySymbol(self, tradeDate=''):
         """下载所有股票的代码"""
@@ -238,8 +281,6 @@ class HistoryDataEngine(object):
 
         self.dbClient[SETTING_DB_NAME]['EquitySymbol'].ensure_index([('symbol', pymongo.ASCENDING)],
                                                                        unique=True)
-
-
         path = 'api/market/getMktEqud.json'
 
         params = {}
@@ -313,6 +354,7 @@ class HistoryDataEngine(object):
         else:
             print u'找不到合约%s' %symbol
 
+
 #----------------------------------------------------------------------
 def downloadEquityDailyBarts(self, symbol):
     """
@@ -362,6 +404,41 @@ def downloadEquityDailyBarts(self, symbol):
         print u'%s下载完成' %symbol
     else:
         print u'找不到合约%s' %symbol
+
+def loadWxCsv(fileName, dbName, symbol):
+    import csv
+
+    start = time()
+    print u'开始读取CSV文件%s中的数据插入到%s的%s中' %(fileName, dbName, symbol)
+
+        # 锁定集合，并创建索引
+    client = pymongo.MongoClient(globalSetting['mongoHost'], globalSetting['mongoPort'])
+    collection = client[dbName][symbol]
+    collection.ensure_index([('datetime', pymongo.ASCENDING)], unique=True)
+
+    # 读取数据和插入到数据库
+    reader = csv.DictReader(file(fileName, 'r'))
+    for d in reader:
+        bar = VtBarData()
+        bar.vtSymbol = symbol
+        bar.symbol = symbol
+        bar.open = float(d['Open'])
+        bar.high = float(d['High'])
+        bar.low = float(d['Low'])
+        bar.close = float(d['Close'])
+
+        date_obj = datetime.strptime(d['Date'], '%Y/%m/%d %H:%M')
+        bar.date = date_obj.strftime('%Y%m%d')
+        bar.time = date_obj.strftime('%H:%M:%S')
+        bar.datetime = datetime.strptime(bar.date + ' ' + bar.time, '%Y%m%d %H:%M:%S')
+        bar.volume = d['Volume']
+
+        flt = {'datetime': bar.datetime}
+        collection.update_one(flt, {'$set':bar.__dict__}, upsert=True)
+        print bar.date, bar.time
+
+    print u'插入完毕，耗时：%s' % (time()-start)
+
 
 #----------------------------------------------------------------------
 def loadMcCsv(fileName, dbName, symbol):
