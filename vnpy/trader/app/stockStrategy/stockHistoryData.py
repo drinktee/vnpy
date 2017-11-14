@@ -427,7 +427,7 @@ def loadWxCsv(fileName, dbName, symbol):
         bar.low = float(d['Low'])
         bar.close = float(d['Close'])
 
-        date_obj = datetime.strptime(d['Date'], '%Y/%m/%d %H:%M')
+        date_obj = datetime.strptime(d['Date'], '%Y-%m-%d %H:%M:%S')
         bar.date = date_obj.strftime('%Y%m%d')
         bar.time = date_obj.strftime('%H:%M:%S')
         bar.datetime = datetime.strptime(bar.date + ' ' + bar.time, '%Y%m%d %H:%M:%S')

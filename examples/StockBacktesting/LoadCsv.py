@@ -9,6 +9,5 @@ from vnpy.trader.app.stockStrategy.stockHistoryData import loadWxCsv
 
 
 if __name__ == '__main__':
-    loadWxCsv('IF0000_1min.csv', MINUTE_DB_NAME, 'IF0000')
-    loadWxCsv('rb0000_1min.csv', MINUTE_DB_NAME, 'rb0000')
+    loadWxCsv('SH000001.csv', MINUTE_DB_NAME, 'SH000001')
 
