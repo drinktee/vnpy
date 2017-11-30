@@ -59,19 +59,15 @@ class HistoryDataEngine(object):
                                                                        unique=True)
         data = ts.get_concept_classified()
 
-        if data:
-            for d in data:
-                symbolDict = {}
-                symbolDict['symbol'] = d['code']
-                symbolDict['name'] = d['name']
-                symbolDict['c_name'] = d['c_name']
-                flt = {'symbol': d['code']}
-
-                self.dbClient[SETTING_DB_NAME]['StockSymbol'].update_one(flt, {'$set':symbolDict},
-                                                                           upsert=True)
+        for idx, d in data.iterrows():
+            symbolDict = {}
+            symbolDict['symbol'] = d['code']
+            symbolDict['name'] = d['name']
+            symbolDict['c_name'] = d['c_name']
+            flt = {'symbol': d['code']}
+            self.dbClient[SETTING_DB_NAME]['StockSymbol'].update_one(flt, {'$set':symbolDict},                                                                           upsert=True)
             print u'期货合约代码下载完成'
-        else:
-            print u'期货合约代码下载失败'
+
 
 #----------------------------------------------------------------------
 def downloadEquityDailyBarts(self, symbol):
