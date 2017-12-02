@@ -30,9 +30,11 @@ SYMBOL_BTC_USDT = 'btc_usdt'
 SYMBOL_LTC_USDT = 'ltc_usdt'
 SYMBOL_ETC_USDT = 'etc_usdt'
 SYMBOL_ETH_USDT = 'eth_usdt'
+SYMBOL_ZEC_USDT = 'zec_usdt'
 
 
 # 行情深度
+DEPTH_5 = 5
 DEPTH_20 = 20
 DEPTH_60 = 60
 
@@ -99,8 +101,6 @@ class OkExApi(object):
         self.secretKey = ''     # 密码
         self.host = ''          # 服务器地址
         
-        self.currency = ''      # 货币类型（usd或者cny）
-        
         self.ws = None          # websocket应用对象
         self.thread = None      # 工作线程
     
@@ -155,12 +155,7 @@ class OkExApi(object):
         self.host = host
         self.apiKey = apiKey
         self.secretKey = secretKey
-        
-        if self.host == OKEX_FUTURE:
-            self.currency = CURRENCY_CNY
-        else:
-            self.currency = CURRENCY_USD
-            
+
         websocket.enableTrace(trace)
         
         self.ws = websocket.WebSocketApp(host, 
@@ -194,7 +189,7 @@ class OkExApi(object):
         if self.thread and self.thread.isAlive():
             self.ws.close()
             self.thread.join()
-        
+
     #----------------------------------------------------------------------
     def sendMarketDataRequest(self, channel):
         """发送行情请求"""
@@ -212,7 +207,28 @@ class OkExApi(object):
             self.ws.send(j)
         except websocket.WebSocketConnectionClosedException:
             pass
-        
+
+    def sendLoginRequest(self):
+        """发送交易请求"""
+        # 在参数字典中加上api_key和签名字段
+        params = dict()
+        params['api_key'] = self.apiKey
+        params['sign'] = self.generateSign(params)
+
+         # 生成请求
+        d = {}
+        d['event'] = 'login'
+        d['parameters'] = params
+
+    # 使用json打包并发送
+        j = json.dumps(d)
+
+        # 若触发异常则重连
+        try:
+            self.ws.send(j)
+        except websocket.WebSocketConnectionClosedException:
+            pass
+
     #----------------------------------------------------------------------
     def sendTradingRequest(self, channel, params):
         """发送交易请求"""
@@ -223,8 +239,7 @@ class OkExApi(object):
         # 生成请求
         d = {}
         d['event'] = 'addChannel'
-        d['binary'] = True
-        d['channel'] = channel        
+        d['channel'] = channel
         d['parameters'] = params
         
         # 使用json打包并发送
@@ -248,28 +263,31 @@ class OkExApi(object):
     #----------------------------------------------------------------------
     def subscribeSpotDepth(self, symbol, depth):
         """订阅现货深度报价"""
-        self.sendMarketDataRequest('ok_sub_spot_%s_depth_%s' %(self.currency, symbol, depth))
+        self.sendMarketDataRequest('ok_sub_spot_%s_depth_%s' %(symbol, depth))
         
     #----------------------------------------------------------------------
     def subscribeSpotTradeData(self, symbol):
         """订阅现货成交记录"""
-        self.sendMarketDataRequest('ok_sub_spot_%s_trades' %(self.currency, symbol))
+        self.sendMarketDataRequest('ok_sub_spot_%s_deals' %(symbol))
         
     #----------------------------------------------------------------------
     def subscribeSpotKline(self, symbol, interval):
         """订阅现货K线"""
-        self.sendMarketDataRequest('ok_sub_spot_%s_kline_%s' %(self.currency, symbol, interval))
-        
+        self.sendMarketDataRequest('ok_sub_spot_%s_kline_%s' %(symbol, interval))
+
+    def login(self):
+        self.sendLoginRequest()
+
     #----------------------------------------------------------------------
     def spotTrade(self, symbol, type_, price, amount):
         """现货委托"""
         params = {}
-        params['symbol'] = str(symbol+self.currency)
+        params['symbol'] = str(symbol)
         params['type'] = str(type_)
         params['price'] = str(price)
         params['amount'] = str(amount)
         
-        channel = 'ok_spot%s_trade' %(self.currency)
+        channel = 'ok_spot_order'
         
         self.sendTradingRequest(channel, params)
         
@@ -277,17 +295,17 @@ class OkExApi(object):
     def spotCancelOrder(self, symbol, orderid):
         """现货撤单"""
         params = {}
-        params['symbol'] = str(symbol+self.currency)
+        params['symbol'] = str(symbol)
         params['order_id'] = str(orderid)
         
-        channel = 'ok_spot%s_cancel_order' %(self.currency)
+        channel = 'ok_spot_cancel_order'
 
         self.sendTradingRequest(channel, params)
         
     #----------------------------------------------------------------------
     def spotUserInfo(self):
         """查询现货账户"""
-        channel = 'ok_spot%s_userinfo' %(self.currency)
+        channel = 'ok_spot_userinfo'
         
         self.sendTradingRequest(channel, {})
         
@@ -295,24 +313,24 @@ class OkExApi(object):
     def spotOrderInfo(self, symbol, orderid):
         """查询现货委托信息"""
         params = {}
-        params['symbol'] = str(symbol+self.currency)
+        params['symbol'] = str(symbol)
         params['order_id'] = str(orderid)
         
-        channel = 'ok_spot%s_orderinfo' %(self.currency)
+        channel = 'ok_spot_orderinfo'
         
         self.sendTradingRequest(channel, params)
         
     #----------------------------------------------------------------------
-    def subscribeSpotTrades(self):
+    def subscribeSpotTrades(self, symbol):
         """订阅现货成交信息"""
-        channel = 'ok_sub_spot%s_trades' %(self.currency)
+        channel = 'ok_sub_spot_%s_order' % symbol
         
         self.sendTradingRequest(channel, {})
         
     #----------------------------------------------------------------------
-    def subscribeSpotUserInfo(self):
+    def subscribeSpotUserInfo(self, symbol):
         """订阅现货账户信息"""
-        channel = 'ok_sub_spot%s_userinfo' %(self.currency)
+        channel = 'ok_sub_spot_%s_balance' % symbol
         
         self.sendTradingRequest(channel, {})
     
@@ -323,35 +341,35 @@ class OkExApi(object):
     #----------------------------------------------------------------------
     def subscribeFutureTicker(self, symbol, expiry):
         """订阅期货普通报价"""
-        self.sendMarketDataRequest('ok_sub_future%s_%s_ticker_%s' %(self.currency, symbol, expiry))
+        self.sendMarketDataRequest('ok_sub_futureusd_%s_ticker_%s' %(symbol, expiry))
     
     #----------------------------------------------------------------------
     def subscribeFutureDepth(self, symbol, expiry, depth):
         """订阅期货深度报价"""
-        self.sendMarketDataRequest('ok_sub_future%s_%s_depth_%s_%s' %(self.currency, symbol, 
+        self.sendMarketDataRequest('ok_sub_futureusd_%s_depth_%s_%s' %(symbol,
                                                                       expiry, depth))   
         
     #----------------------------------------------------------------------
     def subscribeFutureTradeData(self, symbol, expiry):
         """订阅期货成交记录"""
-        self.sendMarketDataRequest('ok_sub_future%s_%s_trade_%s' %(self.currency, symbol, expiry))
+        self.sendMarketDataRequest('ok_sub_futureusd_%s_trade_%s' %(symbol, expiry))
         
     #----------------------------------------------------------------------
     def subscribeFutureKline(self, symbol, expiry, interval):
         """订阅期货K线"""
-        self.sendMarketDataRequest('ok_sub_future%s_%s_kline_%s_%s' %(self.currency, symbol, 
+        self.sendMarketDataRequest('ok_sub_futureusd_%s_kline_%s_%s' %(symbol,
                                                                       expiry, interval))
         
     #----------------------------------------------------------------------
     def subscribeFutureIndex(self, symbol):
         """订阅期货指数"""
-        self.sendMarketDataRequest('ok_sub_future%s_%s_index' %(self.currency, symbol))
+        self.sendMarketDataRequest('ok_sub_futureusd_%s_index' %(symbol))
     
     #----------------------------------------------------------------------
     def futureTrade(self, symbol, expiry, type_, price, amount, order, leverage):
         """期货委托"""
         params = {}
-        params['symbol'] = str(symbol+self.currency)
+        params['symbol'] = str(symbol)
         params['type'] = str(type_)
         params['price'] = str(price)
         params['amount'] = str(amount)
@@ -359,7 +377,7 @@ class OkExApi(object):
         params['match_price'] = str(order)
         params['lever_rate'] = str(leverage)
         
-        channel = 'ok_future%s_trade' %(self.currency)
+        channel = 'ok_futureusd_trade'
         
         self.sendTradingRequest(channel, params)
         
@@ -367,18 +385,18 @@ class OkExApi(object):
     def futureCancelOrder(self, symbol, expiry, orderid):
         """期货撤单"""
         params = {}
-        params['symbol'] = str(symbol+self.currency)
+        params['symbol'] = str(symbol)
         params['order_id'] = str(orderid)
         params['contract_type'] = str(expiry)
         
-        channel = 'ok_future%s_cancel_order' %(self.currency)
+        channel = 'ok_futureusd_cancel_order'
 
         self.sendTradingRequest(channel, params)
         
     #----------------------------------------------------------------------
     def futureUserInfo(self):
         """查询期货账户"""
-        channel = 'ok_future%s_userinfo' %(self.currency)
+        channel = 'ok_futureusd_userinfo'
         
         self.sendTradingRequest(channel, {})
         
@@ -386,36 +404,35 @@ class OkExApi(object):
     def futureOrderInfo(self, symbol, expiry, orderid, status, page, length):
         """查询期货委托信息"""
         params = {}
-        params['symbol'] = str(symbol+self.currency)
+        params['symbol'] = str(symbol)
         params['order_id'] = str(orderid)
         params['contract_type'] = expiry
         params['status'] = status
         params['current_page'] = page
         params['page_length'] = length
         
-        channel = 'ok_future%s_orderinfo' %(self.currency)
+        channel = 'ok_futureusd_orderinfo'
         
         self.sendTradingRequest(channel, params)
         
     #----------------------------------------------------------------------
     def subscribeFutureTrades(self):
         """订阅期货成交信息"""
-        channel = 'ok_sub_future%s_trades' %(self.currency)
+        channel = 'ok_sub_futureusd_trades'
         
         self.sendTradingRequest(channel, {})
         
     #----------------------------------------------------------------------
     def subscribeFutureUserInfo(self):
         """订阅期货账户信息"""
-        channel = 'ok_sub_future%s_userinfo' %(self.currency)
+        channel = 'ok_sub_futureusd_userinfo'
         
         self.sendTradingRequest(channel, {})
         
     #----------------------------------------------------------------------
     def subscribeFuturePositions(self):
         """订阅期货持仓信息"""
-        channel = 'ok_sub_future%s_positions' %(self.currency)
+        channel = 'ok_sub_futureusd_positions'
         
-        self.sendTradingRequest(channel, {})    
-    
+        self.sendTradingRequest(channel, {})
 
