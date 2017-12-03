@@ -8,28 +8,44 @@ from threading import Thread
 from Queue import Queue, Empty
 import requests
 import urllib
+import time
+import hmac
 
 import websocket
 
 # Binance
 BINANCE_HOST = 'wss://stream.binance.com:9443/ws/'
-BINANCE_API_URL = "https://api.binance.com/api"
+BINANCE_API_URL = "https://api.binance.com/api/"
 
 PRIVATE_API_VERSION = 'v3'
 PUBLIC_API_VERSION = 'v1'
 
-#----------------------------------------------------------------------
-def signature(params):
-    """生成签名"""
-    params = sorted(params.iteritems(), key=lambda d:d[0], reverse=False)
-    message = urllib.urlencode(params)
+METHOD_TEST_CONNECT = 'ping'
+METHOD_TIME = 'time'
+METHOD_DEPTH = 'depth'
+METHOD_KLINE = 'klines'
+METHOD_ACCOUNT = 'account'
 
-    m = hashlib.md5()
-    m.update(message)
-    m.digest()
 
-    sig=m.hexdigest()
-    return sig
+SYMBOL_LTC_BTC = 'LTCBTC'
+SYMBOL_BNB_BTC = 'BNBBTC'
+
+# 行情深度
+DEPTH_5 = 5
+DEPTH_20 = 20
+DEPTH_100 = 100
+
+# K线时间区间
+INTERVAL_1M = '1m'
+INTERVAL_3M = '3m'
+INTERVAL_5M = '5m'
+INTERVAL_15M = '15m'
+INTERVAL_30M = '30m'
+INTERVAL_1H = '1h'
+INTERVAL_2H = '2h'
+INTERVAL_4H = '4h'
+INTERVAL_6H = '6h'
+
 
 ########################################################################
 class DataApi(object):
@@ -135,32 +151,31 @@ class TradeApi(object):
         self.reqThread = Thread(target=self.processQueue)   # 请求处理线程
 
     #----------------------------------------------------------------------
+    def signature(self, params):
+        """生成签名"""
+        params = sorted(params.items())
+        message = urllib.urlencode(params)
+        m = hmac.new(bytes(self.secretKey.encode('utf-8')), message.encode('utf-8'), hashlib.sha256)
+        sig = m.hexdigest()
+        return sig
+
+    #----------------------------------------------------------------------
     def processRequest(self, req):
         """处理请求"""
-        # 读取方法和参数
         method = req['method']
         params = req['params']
-        optional = req['optional']
+        signed = req['signed']
 
-        # 在参数中增加必须的字段
-        params['created'] = long(time())
-        params['access_key'] = self.accessKey
-        params['secret_key'] = self.secretKey
-        params['method'] = method
+        url = BINANCE_API_URL + signed + '/' + method
+        if signed == PUBLIC_API_VERSION:
+            r = requests.get(url, params=params)
+        else:
+            params['timestamp'] = int(time.time() * 1000)
+            params['signature'] = self.signature(params)
+            print url, params, self.headers
+            r = requests.get(url, params=params, headers=self.headers)
+            print r.json()
 
-        # 添加签名
-        sign = signature(params)
-        params['sign'] = sign
-        del params['secret_key']
-
-        # 添加选填参数
-        if optional:
-            params.update(optional)
-
-        # 发送请求
-        payload = urllib.urlencode(params)
-
-        r = requests.post(HUOBI_TRADE_API, params=payload)
         if r.status_code == 200:
             data = r.json()
             return data
@@ -177,7 +192,6 @@ class TradeApi(object):
                 reqID = req['reqID']
 
                 data = self.processRequest(req)
-
                 # 请求失败
                 if 'code' in data and 'message' in data:
                     error = u'错误信息：%s' %data['message']
@@ -192,17 +206,17 @@ class TradeApi(object):
                 pass
 
     #----------------------------------------------------------------------
-    def sendRequest(self, method, params, callback, optional=None):
+    def sendRequest(self, method, params, api_version, callback):
         """发送请求"""
         # 请求编号加1
         self.reqID += 1
 
         # 生成请求字典并放入队列中
         req = {}
+        req['signed'] = api_version
         req['method'] = method
         req['params'] = params
         req['callback'] = callback
-        req['optional'] = optional
         req['reqID'] = self.reqID
         self.reqQueue.put(req)
 
@@ -219,6 +233,7 @@ class TradeApi(object):
         self.accessKey = accessKey
         self.secretKey = secretKey
 
+        self.headers = {'X-MBX-APIKEY': self.accessKey}
         self.active = True
         self.reqThread.start()
 
@@ -231,10 +246,93 @@ class TradeApi(object):
             self.reqThread.join()
 
     #----------------------------------------------------------------------
-    def getAccountInfo(self, market='cny'):
+    def getDepth(self, symbol, depth=DEPTH_100):
+        method = METHOD_DEPTH
+        params = dict()
+        params['symbol'] = symbol
+        params['limit'] = depth
+        callback = self.onDepth
+        return self.sendRequest(method, params, PUBLIC_API_VERSION, callback)
+
+
+    #----------------------------------------------------------------------
+    def getKline(self, symbol, interval=INTERVAL_1M, depth=DEPTH_100):
+        method = METHOD_KLINE
+        params = dict()
+        params['symbol'] = symbol
+        params['limit'] = depth
+        params['interval'] = interval
+        callback = self.onKlines
+        return self.sendRequest(method, params, PUBLIC_API_VERSION, callback)
+
+    #----------------------------------------------------------------------
+    def getAccountInfo(self):
         """查询账户"""
-        method = FUNCTIONCODE_GETACCOUNTINFO
+        method = METHOD_ACCOUNT
         params = {}
         callback = self.onGetAccountInfo
-        optional = {'market': market}
-        return self.sendRequest(method, params, callback, optional)
+        return self.sendRequest(method, params, PRIVATE_API_VERSION, callback)
+
+    ####################################################
+    ## 回调函数
+    ####################################################
+
+    #----------------------------------------------------------------------
+    def onError(self, error, req, reqID):
+        """错误推送"""
+        print error, reqID
+
+    #----------------------------------------------------------------------
+    def onDepth(self, data, req, reqID):
+        """错误推送"""
+        print data, reqID
+
+        #----------------------------------------------------------------------
+    def onKlines(self, error, req, reqID):
+        """错误推送"""
+        print error, reqID
+
+    #----------------------------------------------------------------------
+    def onGetAccountInfo(self, data, req, reqID):
+        """查询账户回调"""
+        print data
+
+    #----------------------------------------------------------------------
+    def onGetOrders(self, data, req, reqID, fuck):
+        """查询委托回调"""
+        print data
+
+    #----------------------------------------------------------------------
+    def onOrderInfo(self, data, req, reqID):
+        """委托详情回调"""
+        print data
+
+    #----------------------------------------------------------------------
+    def onBuy(self, data, req, reqID):
+        """买入回调"""
+        print data
+
+    #----------------------------------------------------------------------
+    def onSell(self, data, req, reqID):
+        """卖出回调"""
+        print data
+
+    #----------------------------------------------------------------------
+    def onBuyMarket(self, data, req, reqID):
+        """市价买入回调"""
+        print data
+
+    #----------------------------------------------------------------------
+    def onSellMarket(self, data, req, reqID):
+        """市价卖出回调"""
+        print data
+
+    #----------------------------------------------------------------------
+    def onCancelOrder(self, data, req, reqID):
+        """撤单回调"""
+        print data
+
+    #----------------------------------------------------------------------
+    def onGetNewDealOrders(self, data, req, reqID):
+        """查询最新成交回调"""
+        print data

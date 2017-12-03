@@ -238,8 +238,7 @@ class StDataEngine(object):
         event2 = Event(EVENT_SPREADTRADING_POS)
         event2.dict_['data'] = spread
         self.eventEngine.put(event2)         
-        
-    
+
     #----------------------------------------------------------------------
     def registerEvent(self):
         """"""
