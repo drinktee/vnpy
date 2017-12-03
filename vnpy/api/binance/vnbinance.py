@@ -25,6 +25,13 @@ METHOD_TIME = 'time'
 METHOD_DEPTH = 'depth'
 METHOD_KLINE = 'klines'
 METHOD_ACCOUNT = 'account'
+METHOD_ORDER = 'order'
+METHOD_ORDER_TEST = 'order/test'
+
+HTTP_METHOD_POST = 'post'
+HTTP_METHOD_PUT = 'put'
+HTTP_METHOD_GET = 'get'
+HTTP_METHOD_DELETE = 'delete'
 
 
 SYMBOL_LTC_BTC = 'LTCBTC'
@@ -45,6 +52,20 @@ INTERVAL_1H = '1h'
 INTERVAL_2H = '2h'
 INTERVAL_4H = '4h'
 INTERVAL_6H = '6h'
+
+ORDER_TYPE_LIMIT = 'LIMIT'
+ORDER_TYPE_MARKET = 'MARKET'
+
+ORDER_SIDE_BUY = 'BUY'
+ORDER_SIDE_SELL = 'SELL'
+
+TIMEINFORCE_GTC = 'GTC'
+TIMEINFORCE_IOC = 'IOC'
+
+ORDER_STATUS_NEW = 'NEW'
+ORDER_STATUS_PARTIALLY_FILLED = 'PARTIALLY_FILLED'
+ORDER_STATUS_FILLED = 'FILLED'
+ORDER_STATUS_CANCELED = 'CANCELED'
 
 
 ########################################################################
@@ -165,6 +186,7 @@ class TradeApi(object):
         method = req['method']
         params = req['params']
         signed = req['signed']
+        http_method = req['http_method']
 
         url = BINANCE_API_URL + signed + '/' + method
         if signed == PUBLIC_API_VERSION:
@@ -173,7 +195,15 @@ class TradeApi(object):
             params['timestamp'] = int(time.time() * 1000)
             params['signature'] = self.signature(params)
             print url, params, self.headers
-            r = requests.get(url, params=params, headers=self.headers)
+
+            if http_method == HTTP_METHOD_POST:
+                r = requests.post(url, params=params, headers=self.headers)
+            elif http_method == HTTP_METHOD_DELETE:
+                r = requests.delete(url, params=params, headers=self.headers)
+            elif http_method == HTTP_METHOD_PUT:
+                r = requests.put(url, params=params, headers=self.headers)
+            else:
+                r = requests.get(url, params=params, headers=self.headers)
             print r.json()
 
         if r.status_code == 200:
@@ -206,13 +236,14 @@ class TradeApi(object):
                 pass
 
     #----------------------------------------------------------------------
-    def sendRequest(self, method, params, api_version, callback):
+    def sendRequest(self, method, params, api_version, callback, http_method = HTTP_METHOD_GET):
         """发送请求"""
         # 请求编号加1
         self.reqID += 1
 
         # 生成请求字典并放入队列中
         req = {}
+        req['http_method'] = http_method
         req['signed'] = api_version
         req['method'] = method
         req['params'] = params
@@ -273,6 +304,24 @@ class TradeApi(object):
         callback = self.onGetAccountInfo
         return self.sendRequest(method, params, PRIVATE_API_VERSION, callback)
 
+    #----------------------------------------------------------------------
+    def trade(self, symbol, side, type, quanlity, price, test=False):
+        """交易"""
+        if test == True:
+            method = METHOD_ORDER_TEST
+        else:
+            method = METHOD_ORDER
+
+        http_method = HTTP_METHOD_POST
+        params = {}
+        params['symbol'] = symbol
+        params['side'] = side
+        params['type'] = type
+        params['quanlity'] = quanlity
+        params['price'] = price
+        callback = self.onTrade
+        return self.sendRequest(method, params, PRIVATE_API_VERSION, callback, http_method)
+
     ####################################################
     ## 回调函数
     ####################################################
@@ -295,6 +344,11 @@ class TradeApi(object):
     #----------------------------------------------------------------------
     def onGetAccountInfo(self, data, req, reqID):
         """查询账户回调"""
+        print data
+
+    #----------------------------------------------------------------------
+    def onTrade(self, data, req, reqID):
+        """交易成功回调"""
         print data
 
     #----------------------------------------------------------------------

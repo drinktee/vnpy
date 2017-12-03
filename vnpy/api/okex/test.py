@@ -3,8 +3,8 @@
 from vnokex import *
 
 # 在OkCoin网站申请这两个Key，分别对应用户名和密码
-apiKey = '37fed69c-546b-4f2d-a2ef-27e187e6b7db'
-secretKey = '051280CD9C8DB9569AF222FC4ECF23C8'
+apiKey = ''
+secretKey = ''
 
 # 创建API对象
 api = OkExApi()
