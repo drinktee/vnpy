@@ -174,7 +174,6 @@ class TradeApi(object):
     #----------------------------------------------------------------------
     def signature(self, params):
         """生成签名"""
-        params = sorted(params.items())
         message = urllib.urlencode(params)
         m = hmac.new(bytes(self.secretKey.encode('utf-8')), message.encode('utf-8'), hashlib.sha256)
         sig = m.hexdigest()
@@ -195,7 +194,6 @@ class TradeApi(object):
             params['timestamp'] = int(time.time() * 1000)
             params['signature'] = self.signature(params)
             print url, params, self.headers
-
             if http_method == HTTP_METHOD_POST:
                 r = requests.post(url, params=params, headers=self.headers)
             elif http_method == HTTP_METHOD_DELETE:
@@ -285,7 +283,6 @@ class TradeApi(object):
         callback = self.onDepth
         return self.sendRequest(method, params, PUBLIC_API_VERSION, callback)
 
-
     #----------------------------------------------------------------------
     def getKline(self, symbol, interval=INTERVAL_1M, depth=DEPTH_100):
         method = METHOD_KLINE
@@ -305,7 +302,31 @@ class TradeApi(object):
         return self.sendRequest(method, params, PRIVATE_API_VERSION, callback)
 
     #----------------------------------------------------------------------
-    def trade(self, symbol, side, type, quanlity, price, test=False):
+    def cancelTrade(self, symbol, order_id=-1):
+        """撤销交易"""
+        method = METHOD_ORDER
+        http_method = HTTP_METHOD_DELETE
+        params = {}
+        params['symbol'] = symbol
+        if order_id >= 0:
+            params['orderId'] = order_id
+        callback = self.onCancelTrade
+        return self.sendRequest(method, params, PRIVATE_API_VERSION, callback, http_method)
+
+    #----------------------------------------------------------------------
+    def queryTrade(self, symbol, order_id=-1):
+        """撤销交易"""
+        method = METHOD_ORDER
+        http_method = HTTP_METHOD_GET
+        params = {}
+        params['symbol'] = symbol
+        if order_id >= 0:
+            params['orderId'] = order_id
+        callback = self.onGetOrders
+        return self.sendRequest(method, params, PRIVATE_API_VERSION, callback, http_method)
+
+    #----------------------------------------------------------------------
+    def trade(self, symbol, side, type, time_in_force, quantity, price, test=False):
         """交易"""
         if test == True:
             method = METHOD_ORDER_TEST
@@ -315,9 +336,10 @@ class TradeApi(object):
         http_method = HTTP_METHOD_POST
         params = {}
         params['symbol'] = symbol
-        params['side'] = side
-        params['type'] = type
-        params['quanlity'] = quanlity
+        params['side'] = str(side)
+        params['type'] = str(type)
+        params['timeInForce'] = time_in_force
+        params['quantity'] = quantity
         params['price'] = price
         callback = self.onTrade
         return self.sendRequest(method, params, PRIVATE_API_VERSION, callback, http_method)
@@ -348,6 +370,11 @@ class TradeApi(object):
 
     #----------------------------------------------------------------------
     def onTrade(self, data, req, reqID):
+        """交易成功回调"""
+        print data
+
+    #----------------------------------------------------------------------
+    def onCancelTrade(self, data, req, reqID):
         """交易成功回调"""
         print data
 

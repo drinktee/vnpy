@@ -20,6 +20,6 @@ api.init(apiKey, secretKey)
 #api.getDepth(SYMBOL_LTC_BTC)
 #api.getKline(SYMBOL_LTC_BTC)
 #api.getAccountInfo()
-api.trade(SYMBOL_LTC_BTC, ORDER_SIDE_BUY, ORDER_TYPE_LIMIT, 0.01, 100, True)
+api.trade(SYMBOL_LTC_BTC, ORDER_SIDE_BUY, ORDER_TYPE_LIMIT, TIMEINFORCE_GTC, 0.1, 0.01, True)
 
 input()

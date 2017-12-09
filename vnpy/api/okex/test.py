@@ -15,7 +15,7 @@ api.connect(OKEX_SPOT, apiKey, secretKey, True)
 sleep(1)
 
 # 测试登录
-# api.login()
+api.login()
 
 # 测试现货行情API
 #api.subscribeSpotTicker(SYMBOL_BTC_USDT)
@@ -25,19 +25,19 @@ sleep(1)
 
 
 # 测试现货交易API
-#api.subscribeSpotTrades()
-#api.subscribeSpotUserInfo()
+api.subscribeSpotTrades(SYMBOL_LTC_USDT)
+#api.subscribeSpotUserInfo(SYMBOL_BTC_USDT)
 #api.spotUserInfo()
 
 # 下单逻辑
-# api.spotTrade(SYMBOL_ZEC_USDT, TYPE_BUY, 350, 0.01)
+api.spotTrade(SYMBOL_LTC_USDT, TYPE_BUY, 151, 0.01)
 
 # 下单取消
 # api.spotTrade(SYMBOL_ZEC_USDT, TYPE_BUY, 100, 0.01)
 # api.spotCancelOrder(SYMBOL_ZEC_USDT, order_id)
 
 # 测试期货行情API
-# api.subscribeFutureTicker(SYMBOL_BTC_FUTURE, FUTURE_EXPIRY_THIS_WEEK)
+# api.subscribeFutureTicker(SYMBOL_ETH_FUTURE, FUTURE_EXPIRY_THIS_WEEK)
 # api.subscribeFutureDepth(SYMBOL_LTC_FUTURE, FUTURE_EXPIRY_QUARTER, DEPTH_20)
 # api.subscribeFutureKline(SYMBOL_BTC_FUTURE, FUTURE_EXPIRY_THIS_WEEK, INTERVAL_1M)
 # api.subscribeFutureIndex(SYMBOL_BTC_FUTURE)
@@ -52,7 +52,7 @@ sleep(1)
 #api.futureCancelOrder(symbol, expiry, orderid)
 #api.futureOrderInfo(symbol, expiry, orderid, status, page, length)
 #api.subscribeFutureUserInfo()
-api.subscribeFutureTrades()
+#api.subscribeFutureTrades()
 
 
 raw_input()

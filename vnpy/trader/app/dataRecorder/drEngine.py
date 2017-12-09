@@ -190,8 +190,6 @@ class DrEngine(object):
             if vtSymbol in self.activeSymbolDict:
                 activeSymbol = self.activeSymbolDict[vtSymbol]
                 self.insertData(TICK_DB_NAME, activeSymbol, tick)
-            
-            
             self.writeDrLog(text.TICK_LOGGING_MESSAGE.format(symbol=tick.vtSymbol,
                                                              time=tick.time, 
                                                              last=tick.lastPrice, 

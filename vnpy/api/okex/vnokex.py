@@ -20,6 +20,7 @@ CURRENCY_USD = 'usd'
 # 电子货币代码(期货)
 SYMBOL_BTC_FUTURE = 'btc'
 SYMBOL_LTC_FUTURE = 'ltc'
+SYMBOL_ETH_FUTURE = 'eth'
 
 # 电子货币代码(现货)
 SYMBOL_LTC_BTC = 'ltc_btc'
@@ -100,7 +101,8 @@ class OkExApi(object):
         self.apiKey = ''        # 用户名
         self.secretKey = ''     # 密码
         self.host = ''          # 服务器地址
-        
+
+        self.currency = ""
         self.ws = None          # websocket应用对象
         self.thread = None      # 工作线程
     
@@ -150,14 +152,15 @@ class OkExApi(object):
         print 'onOpen'
         
     #----------------------------------------------------------------------
-    def connect(self, host, apiKey, secretKey, trace=False):
+    def connect(self, host, apiKey, secretKey, currency='usdt', trace=False):
         """连接服务器"""
         self.host = host
         self.apiKey = apiKey
         self.secretKey = secretKey
 
         websocket.enableTrace(trace)
-        
+
+        self.currency = currency
         self.ws = websocket.WebSocketApp(host, 
                                          on_message=self.onMessage,
                                          on_error=self.onError,
