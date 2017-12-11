@@ -3,8 +3,8 @@
 from vnokex import *
 
 # 在OkCoin网站申请这两个Key，分别对应用户名和密码
-apiKey = ''
-secretKey = ''
+apiKey = '37fed69c-546b-4f2d-a2ef-27e187e6b7db'
+secretKey = '051280CD9C8DB9569AF222FC4ECF23C8'
 
 # 创建API对象
 api = OkExApi()
@@ -30,7 +30,7 @@ api.subscribeSpotTrades(SYMBOL_LTC_USDT)
 #api.spotUserInfo()
 
 # 下单逻辑
-api.spotTrade(SYMBOL_LTC_USDT, TYPE_BUY, 151, 0.01)
+api.spotTrade(SYMBOL_LTC_USDT, TYPE_BUY, 100, 0.01)
 
 # 下单取消
 # api.spotTrade(SYMBOL_ZEC_USDT, TYPE_BUY, 100, 0.01)

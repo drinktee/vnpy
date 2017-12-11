@@ -102,7 +102,7 @@ class OkExApi(object):
         self.secretKey = ''     # 密码
         self.host = ''          # 服务器地址
 
-        self.currency = ""
+        self.currency = {'usdt', 'btc', 'eth'}
         self.ws = None          # websocket应用对象
         self.thread = None      # 工作线程
     
@@ -152,7 +152,7 @@ class OkExApi(object):
         print 'onOpen'
         
     #----------------------------------------------------------------------
-    def connect(self, host, apiKey, secretKey, currency='usdt', trace=False):
+    def connect(self, host, apiKey, secretKey, trace=False):
         """连接服务器"""
         self.host = host
         self.apiKey = apiKey
@@ -160,7 +160,6 @@ class OkExApi(object):
 
         websocket.enableTrace(trace)
 
-        self.currency = currency
         self.ws = websocket.WebSocketApp(host, 
                                          on_message=self.onMessage,
                                          on_error=self.onError,

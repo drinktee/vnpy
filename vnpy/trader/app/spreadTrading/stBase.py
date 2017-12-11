@@ -162,7 +162,3 @@ class StSpread(object):
     def addPassiveLeg(self, leg):
         """添加被动腿"""
         self.passiveLegs.append(leg)
-        
-        
-    
-    
