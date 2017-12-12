@@ -59,9 +59,17 @@ def testData():
     print data
     
     input()
+
+
+def testDataWebsocket():
+    accessKey = ''
+    secretKey = ''
+    api = DataWebSocketApi()
+    api.connect(HUOBI_WEBSOCKET_WSS, accessKey, secretKey)
+
     
     
 if __name__ == '__main__':
     #testTrade()
-    
-    testData()
+    #testData()
+    testDataWebsocket()

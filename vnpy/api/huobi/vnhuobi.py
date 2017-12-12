@@ -9,6 +9,11 @@ from time import time, sleep
 from Queue import Queue, Empty
 from threading import Thread
 
+import websocket
+import gzip
+import StringIO
+
+
 
 # 常量定义
 COINTYPE_BTC = 1
@@ -29,18 +34,10 @@ SYMBOL_BTCCNY = 'BTC_CNY'
 SYMBOL_LTCCNY = 'LTC_CNY'
 SYMBOL_BTCUSD = 'BTC_USD'
 
-PERIOD_1MIN = '001'
-PERIOD_5MIN = '005'
-PERIOD_15MIN = '015'
-PERIOD_30MIN = '030'
-PERIOD_60MIN = '060'
-PERIOD_DAILY = '100'
-PERIOD_WEEKLY = '200'
-PERIOD_MONTHLY = '300'
-PERIOD_ANNUALLY = '400'
 
 # API相关定义
 HUOBI_TRADE_API = 'https://api.huobi.com/apiv3'
+HUOBI_WEBSOCKET_WSS = 'wss://api.huobi.pro/ws'
 
 # 功能代码
 FUNCTIONCODE_GETACCOUNTINFO = 'get_account_info'
@@ -63,6 +60,24 @@ FUNCTIONCODE_GETLOANAVAILABLE = 'get_loan_available'
 FUNCTIONCODE_GETLOANS = 'get_loans'
 
 
+SYMBOL_ETHBTC = 'ethbtc'
+SYMBOL_LTCBTC = 'ltcbtc'
+
+PERIOD_1MIN = '1min'
+PERIOD_5MIN = '5min'
+PERIOD_15MIN = '15min'
+PERIOD_30MIN = '30min'
+PERIOD_60MIN = '60min'
+PERIOD_DAILY = '1day'
+PERIOD_WEEKLY = '1week'
+PERIOD_MONTHLY = '1mon'
+PERIOD_ANNUALLY = '1year'
+
+DEPTH_STEP0 = 'step0'
+DEPTH_STEP1 = 'step1'
+DEPTH_STEP2 = 'step2'
+DEPTH_STEP3 = 'step3'
+DEPTH_STEP4 = 'step4'
 #----------------------------------------------------------------------
 def signature(params):
     """生成签名"""
@@ -520,6 +535,147 @@ class TradeApi(object):
         """查询杠杆列表"""
         print data        
         
+
+class DataWebSocketApi(object):
+        #----------------------------------------------------------------------
+    def __init__(self):
+        """Constructor"""
+        self.apiKey = ''        # 用户名
+        self.secretKey = ''     # 密码
+        self.host = ''          # 服务器地址
+
+        self.ws = None          # websocket应用对象
+        self.thread = None      # 工作线程
+
+    #######################
+    ## 通用函数
+    #######################
+
+    #----------------------------------------------------------------------
+    def readData(self, evt):
+        """解压缩推送收到的数据"""
+        # 通过json解析字符串
+        compressedstream = StringIO.StringIO(evt)
+        gzipper = gzip.GzipFile(fileobj=compressedstream)
+        json_data = gzipper.read() # data就是解压后的数据
+        data = json.loads(json_data)
+        return data
+
+    #----------------------------------------------------------------------
+    def generateSign(self, params):
+        """生成签名"""
+        l = []
+        for key in sorted(params.keys()):
+            l.append('%s=%s' %(key, params[key]))
+        l.append('secret_key=%s' %self.secretKey)
+        sign = '&'.join(l)
+        return hashlib.md5(sign.encode('utf-8')).hexdigest().upper()
+
+    #----------------------------------------------------------------------
+    def onMessage(self, ws, evt):
+        """信息推送"""
+        print 'onMessage'
+        data = self.readData(evt)
+        print data
+        self.pong(data['ping'])
+
+
+    #----------------------------------------------------------------------
+    def onError(self, ws, evt):
+        """错误推送"""
+        print 'onError'
+        print evt
+
+    #----------------------------------------------------------------------
+    def onClose(self, ws):
+        """接口断开"""
+        print 'onClose'
+
+    #----------------------------------------------------------------------
+    def onOpen(self, ws):
+        """接口打开"""
+        print 'onOpen'
+
+    #----------------------------------------------------------------------
+    def connect(self, host, apiKey, secretKey, trace=False):
+        """连接服务器"""
+        self.host = host
+        self.apiKey = apiKey
+        self.secretKey = secretKey
+
+        websocket.enableTrace(trace)
+
+        self.ws = websocket.WebSocketApp(host,
+                                         on_message=self.onMessage,
+                                         on_error=self.onError,
+                                         on_close=self.onClose,
+                                         on_open=self.onOpen)
+
+        self.thread = Thread(target=self.ws.run_forever)
+        self.thread.start()
+
+    #----------------------------------------------------------------------
+    def reconnect(self):
+        """重新连接"""
+        # 首先关闭之前的连接
+        self.close()
+
+        # 再执行重连任务
+        self.ws = websocket.WebSocketApp(self.host,
+                                         on_message=self.onMessage,
+                                         on_error=self.onError,
+                                         on_close=self.onClose,
+                                         on_open=self.onOpen)
+
+        self.thread = Thread(target=self.ws.run_forever)
+        self.thread.start()
+
+    #----------------------------------------------------------------------
+    def close(self):
+        """关闭接口"""
+        if self.thread and self.thread.isAlive():
+            self.ws.close()
+            self.thread.join()
+
+    #----------------------------------------------------------------------
+    def pong(self, number):
+        d = {}
+        d['pong'] = number
+        j = json.dumps(d)
+        try:
+            self.ws.send(j)
+        except websocket.WebSocketConnectionClosedException:
+            pass
+
+    #---------------------------------------------------
+    def sendDepthDataRequest(self):
+        d = {}
+        d['pong'] = number
+        j = json.dumps(d)
+        try:
+            self.ws.send(j)
+        except websocket.WebSocketConnectionClosedException:
+            pass
+
+
+    #----------------------------------------------------------------------
+    def sendMarketDataRequest(self, channel):
+        """发送行情请求"""
+        # 生成请求
+        d = {}
+        d['event'] = 'addChannel'
+        #d['binary'] = True
+        d['channel'] = channel
+
+        # 使用json打包并发送
+        j = json.dumps(d)
+
+        # 若触发异常则重连
+        try:
+            self.ws.send(j)
+        except websocket.WebSocketConnectionClosedException:
+            pass
+
 
 ########################################################################
 class DataApi(object):
