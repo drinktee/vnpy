@@ -36,7 +36,8 @@ SYMBOL_BTCUSD = 'BTC_USD'
 
 
 # API相关定义
-HUOBI_TRADE_API = 'https://api.huobi.com/apiv3'
+HUOBI_TRADE_API = 'https://api.huobi.pro/v1'
+HUOBI_MARKET_API = 'https://api.huobi.pro/market'
 HUOBI_WEBSOCKET_WSS = 'wss://api.huobi.pro/ws'
 
 # 功能代码
@@ -78,6 +79,8 @@ DEPTH_STEP1 = 'step1'
 DEPTH_STEP2 = 'step2'
 DEPTH_STEP3 = 'step3'
 DEPTH_STEP4 = 'step4'
+
+
 #----------------------------------------------------------------------
 def signature(params):
     """生成签名"""
@@ -90,7 +93,136 @@ def signature(params):
 
     sig=m.hexdigest()
     return sig    
-    
+
+########################################################################
+class DataApi(object):
+    """行情接口"""
+
+    TICK_SYMBOL_URL = {
+        SYMBOL_BTCCNY: 'http://api.huobi.com/staticmarket/detail_btc_json.js',
+        SYMBOL_LTCCNY: 'http://api.huobi.com/staticmarket/detail_ltc_json.js',
+        SYMBOL_BTCUSD: 'http://api.huobi.com/usdmarket/detail_btc_json.js'
+    }
+
+    QUOTE_SYMBOL_URL = {
+        SYMBOL_BTCCNY: 'http://api.huobi.com/staticmarket/ticker_btc_json.js',
+        SYMBOL_LTCCNY: 'http://api.huobi.com/staticmarket/ticker_ltc_json.js',
+        SYMBOL_BTCUSD: 'http://api.huobi.com/usdmarket/ticker_btc_json.js'
+    }
+
+    DEPTH_SYMBOL_URL = {
+        SYMBOL_BTCCNY: 'http://api.huobi.com/staticmarket/depth_btc_json.js',
+        SYMBOL_LTCCNY: 'http://api.huobi.com/staticmarket/depth_ltc_json.js',
+        SYMBOL_BTCUSD: 'http://api.huobi.com/usdmarket/depth_btc_json.js'
+    }
+
+    KLINE_SYMBOL_URL = 'http://api.huobi.pro/v1/market/history/kline'
+
+    DEBUG = True
+
+    #----------------------------------------------------------------------
+    def __init__(self):
+        """Constructor"""
+        self.active = False
+
+        self.taskInterval = 0                       # 每轮请求延时
+        self.taskList = []                          # 订阅的任务列表
+        self.taskThread = Thread(target=self.run)   # 处理任务的线程
+
+        self.payload = {'User-Agent':
+                           'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.71 Safari/537.36''}
+
+    #----------------------------------------------------------------------
+    def init(self, interval, debug):
+        """初始化"""
+        self.taskInterval = interval
+        self.DEBUG = debug
+
+        self.active = True
+        self.taskThread.start()
+
+    #----------------------------------------------------------------------
+    def exit(self):
+        """退出"""
+        self.active = False
+
+        if self.taskThread.isAlive():
+            self.taskThread.join()
+
+    #----------------------------------------------------------------------
+    def run(self):
+        """连续运行"""
+        while self.active:
+            for url, callback in self.taskList:
+                try:
+                    r = requests.get(url)
+                    if r.status_code == 200:
+                        data = r.json()
+                        if self.DEBUG:
+                            print callback.__name__
+                        callback(data)
+                except Exception, e:
+                    print e
+
+            sleep(self.taskInterval)
+
+    #----------------------------------------------------------------------
+    def subscribeTick(self, symbol):
+        """订阅实时成交数据"""
+        url = self.TICK_SYMBOL_URL[symbol]
+        task = (url, self.onTick)
+        self.taskList.append(task)
+
+    #----------------------------------------------------------------------
+    def subscribeQuote(self, symbol):
+        """订阅实时报价数据"""
+        url = self.QUOTE_SYMBOL_URL[symbol]
+        task = (url, self.onQuote)
+        self.taskList.append(task)
+
+    #----------------------------------------------------------------------
+    def subscribeDepth(self, symbol, level=0):
+        """订阅深度数据"""
+        url = self.DEPTH_SYMBOL_URL[symbol]
+
+        if level:
+            url = url.replace('json', str(level))
+
+        task = (url, self.onDepth)
+        self.taskList.append(task)
+
+    #----------------------------------------------------------------------
+    def onTick(self, data):
+        """实时成交推送"""
+        print data
+
+    #----------------------------------------------------------------------
+    def onQuote(self, data):
+        """实时报价推送"""
+        print data
+
+    #----------------------------------------------------------------------
+    def onDepth(self, data):
+        """实时深度推送"""
+        print data
+
+    #----------------------------------------------------------------------
+    def getKline(self, symbol, period, length=0):
+        """查询K线数据"""
+        url = self.KLINE_SYMBOL_URL[symbol]
+        url = url.replace('[period]', period)
+
+        if length:
+            url = url + '?length=' + str(length)
+
+        try:
+            r = requests.get(url)
+            if r.status_code == 200:
+                data = r.json()
+                return data
+        except Exception, e:
+            print e
+            return None
 
 ########################################################################
 class TradeApi(object):
@@ -562,23 +694,11 @@ class DataWebSocketApi(object):
         return data
 
     #----------------------------------------------------------------------
-    def generateSign(self, params):
-        """生成签名"""
-        l = []
-        for key in sorted(params.keys()):
-            l.append('%s=%s' %(key, params[key]))
-        l.append('secret_key=%s' %self.secretKey)
-        sign = '&'.join(l)
-        return hashlib.md5(sign.encode('utf-8')).hexdigest().upper()
-
-    #----------------------------------------------------------------------
     def onMessage(self, ws, evt):
         """信息推送"""
         print 'onMessage'
         data = self.readData(evt)
         print data
-        self.pong(data['ping'])
-
 
     #----------------------------------------------------------------------
     def onError(self, ws, evt):
@@ -648,161 +768,50 @@ class DataWebSocketApi(object):
             pass
 
     #---------------------------------------------------
-    def sendDepthDataRequest(self):
+    def sendDepthDataRequest(self, symbol, depth_type):
         d = {}
-        d['pong'] = number
+        d['sub'] = "market.%s.depth.%s" % (symbol, depth_type)
+        d['id'] = "id10"
         j = json.dumps(d)
+        print j
         try:
             self.ws.send(j)
         except websocket.WebSocketConnectionClosedException:
             pass
 
-
-    #----------------------------------------------------------------------
-    def sendMarketDataRequest(self, channel):
-        """发送行情请求"""
-        # 生成请求
+    #---------------------------------------------------
+    def sendKlineDataRequest(self, symbol, period):
         d = {}
-        d['event'] = 'addChannel'
-        #d['binary'] = True
-        d['channel'] = channel
-
-        # 使用json打包并发送
+        d['sub'] = "market.%s.kline.%s" % (symbol, period)
+        d['id'] = "id9"
         j = json.dumps(d)
-
-        # 若触发异常则重连
+        print j
         try:
             self.ws.send(j)
         except websocket.WebSocketConnectionClosedException:
             pass
 
-
-########################################################################
-class DataApi(object):
-    """行情接口"""
-    TICK_SYMBOL_URL = {
-        SYMBOL_BTCCNY: 'http://api.huobi.com/staticmarket/detail_btc_json.js',
-        SYMBOL_LTCCNY: 'http://api.huobi.com/staticmarket/detail_ltc_json.js',
-        SYMBOL_BTCUSD: 'http://api.huobi.com/usdmarket/detail_btc_json.js'
-    }
-    
-    QUOTE_SYMBOL_URL = {
-        SYMBOL_BTCCNY: 'http://api.huobi.com/staticmarket/ticker_btc_json.js',
-        SYMBOL_LTCCNY: 'http://api.huobi.com/staticmarket/ticker_ltc_json.js',
-        SYMBOL_BTCUSD: 'http://api.huobi.com/usdmarket/ticker_btc_json.js'
-    }  
-    
-    DEPTH_SYMBOL_URL = {
-        SYMBOL_BTCCNY: 'http://api.huobi.com/staticmarket/depth_btc_json.js',
-        SYMBOL_LTCCNY: 'http://api.huobi.com/staticmarket/depth_ltc_json.js',
-        SYMBOL_BTCUSD: 'http://api.huobi.com/usdmarket/depth_btc_json.js'
-    }    
-    
-    KLINE_SYMBOL_URL = {
-        SYMBOL_BTCCNY: 'http://api.huobi.com/staticmarket/btc_kline_[period]_json.js',
-        SYMBOL_LTCCNY: 'http://api.huobi.com/staticmarket/btc_kline_[period]_json.js',
-        SYMBOL_BTCUSD: 'http://api.huobi.com/usdmarket/btc_kline_[period]_json.js'
-    }        
-    
-    DEBUG = True
-
-    #----------------------------------------------------------------------
-    def __init__(self):
-        """Constructor"""
-        self.active = False
-        
-        self.taskInterval = 0                       # 每轮请求延时
-        self.taskList = []                          # 订阅的任务列表
-        self.taskThread = Thread(target=self.run)   # 处理任务的线程
-    
-    #----------------------------------------------------------------------
-    def init(self, interval, debug):
-        """初始化"""
-        self.taskInterval = interval
-        self.DEBUG = debug
-        
-        self.active = True
-        self.taskThread.start()
-        
-    #----------------------------------------------------------------------
-    def exit(self):
-        """退出"""
-        self.active = False
-        
-        if self.taskThread.isAlive():
-            self.taskThread.join()
-        
-    #----------------------------------------------------------------------
-    def run(self):
-        """连续运行"""
-        while self.active:
-            for url, callback in self.taskList:
-                try:
-                    r = requests.get(url)
-                    if r.status_code == 200:
-                        data = r.json()
-                        if self.DEBUG:
-                            print callback.__name__
-                        callback(data)
-                except Exception, e:
-                    print e
-                    
-            sleep(self.taskInterval)
-            
-    #----------------------------------------------------------------------
-    def subscribeTick(self, symbol):
-        """订阅实时成交数据"""
-        url = self.TICK_SYMBOL_URL[symbol]
-        task = (url, self.onTick)
-        self.taskList.append(task)
-        
-    #----------------------------------------------------------------------
-    def subscribeQuote(self, symbol):
-        """订阅实时报价数据"""
-        url = self.QUOTE_SYMBOL_URL[symbol]
-        task = (url, self.onQuote)
-        self.taskList.append(task)
-        
-    #----------------------------------------------------------------------
-    def subscribeDepth(self, symbol, level=0):
-        """订阅深度数据"""
-        url = self.DEPTH_SYMBOL_URL[symbol]
-        
-        if level:
-            url = url.replace('json', str(level))
-        
-        task = (url, self.onDepth)
-        self.taskList.append(task)        
-        
-    #----------------------------------------------------------------------
-    def onTick(self, data):
-        """实时成交推送"""
-        print data
-        
-    #----------------------------------------------------------------------
-    def onQuote(self, data):
-        """实时报价推送"""
-        print data    
-    
-    #----------------------------------------------------------------------
-    def onDepth(self, data):
-        """实时深度推送"""
-        print data        
-
-    #----------------------------------------------------------------------
-    def getKline(self, symbol, period, length=0):
-        """查询K线数据"""
-        url = self.KLINE_SYMBOL_URL[symbol]
-        url = url.replace('[period]', period)
-        
-        if length:
-            url = url + '?length=' + str(length)
-            
+    #---------------------------------------------------
+    def sendTradeDetailDataRequest(self, symbol):
+        d = {}
+        d['sub'] = "market.%s.trade.detail" % (symbol)
+        d['id'] = "id8"
+        j = json.dumps(d)
+        print j
         try:
-            r = requests.get(url)
-            if r.status_code == 200:
-                data = r.json()
-                return data
-        except Exception, e:
-            print e
-            return None
+            self.ws.send(j)
+        except websocket.WebSocketConnectionClosedException:
+            pass
+
+    #---------------------------------------------------
+    def sendMarketDetailDataRequest(self, symbol):
+        d = {}
+        d['sub'] = "market.%s.detail" % (symbol)
+        d['id'] = "id7"
+        j = json.dumps(d)
+        print j
+        try:
+            self.ws.send(j)
+        except websocket.WebSocketConnectionClosedException:
+            pass
+
