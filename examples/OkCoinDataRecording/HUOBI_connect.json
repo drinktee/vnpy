@@ -1,6 +1,6 @@
 {
-    "accessKey": "8326e2b5-15bac5d1-edf76729-ae618",
-    "secretKey": "9ef30aeb-3a052184-5267daf1-2b0d1",
+    "accessKey": "",
+    "secretKey": "",
     "interval": 0.5,
     "market": "cny",
     "debug": false

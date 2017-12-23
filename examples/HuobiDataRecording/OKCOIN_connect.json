@@ -1,7 +1,7 @@
 {
     "host": "CNY", 
-    "apiKey": "f1686545-1012-400e-8ddc-1c0dfeea1abe",
-    "secretKey": "6A1A054D0978788F132DDDFDFB94A439",
+    "apiKey": "",
+    "secretKey": "",
     "trace": false,
     "leverage": 20
 }
