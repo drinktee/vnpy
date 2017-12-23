@@ -59,9 +59,17 @@ def testData():
     print data
     
     input()
-    
-    
+
+
+def testDataWebsocket():
+    accessKey = ''
+    secretKey = ''
+    api = DataWebSocketApi()
+    api.connect(HUOBI_WEBSOCKET_WSS, accessKey, secretKey)
+    sleep(5)
+    api.sendDepthDataRequest(SYMBOL_ETHBTC, DEPTH_STEP0)
+
 if __name__ == '__main__':
     #testTrade()
-    
-    testData()
+    #testData()
+    testDataWebsocket()

@@ -588,7 +588,7 @@ class CtaEngine(object):
         self.mainEngine.dbUpdate(POSITION_DB_NAME, strategy.className,
                                  d, flt, True)
         
-        content = '策略%s持仓保存成功，当前持仓%s' %(strategy.name, strategy.pos)
+        content = u'策略%s持仓保存成功，当前持仓%s' %(strategy.name, strategy.pos)
         self.writeCtaLog(content)
     
     #----------------------------------------------------------------------

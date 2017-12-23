@@ -30,7 +30,7 @@ api.subscribeSpotTrades(SYMBOL_LTC_USDT)
 #api.spotUserInfo()
 
 # 下单逻辑
-api.spotTrade(SYMBOL_LTC_USDT, TYPE_BUY, 151, 0.01)
+api.spotTrade(SYMBOL_LTC_USDT, TYPE_BUY, 100, 0.01)
 
 # 下单取消
 # api.spotTrade(SYMBOL_ZEC_USDT, TYPE_BUY, 100, 0.01)

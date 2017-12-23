@@ -330,39 +330,20 @@ class Api(vnokex.OkExApi):
         """订阅行情信息"""
         self.subscribeSpotDepth(spotSymbolMapReverse[subscribeReq], DEPTH_20)
         self.symbolSet.add(fundsSymbolMap[subscribeReq])
+        self.cbDict['ok_sub_spot_%s_ticker' % (spotSymbolMapReverse[subscribeReq])] = self.onTicker
+        self.cbDict['ok_sub_spot_%s_depth_20' % (spotSymbolMapReverse[subscribeReq])] = self.onDepth
+        self.cbDict['ok_spot_%s_balance' % (spotSymbolMapReverse[subscribeReq])] = self.onSpotSubUserInfo
+        self.cbDict['ok_spot_%s_order' % (spotSymbolMapReverse[subscribeReq])] = self.onSpotSubTrades
 
     #----------------------------------------------------------------------
     def initCallback(self):
         """初始化回调函数"""
         # USD_SPOT
-        self.cbDict['ok_sub_spot_btc_usdt_ticker'] = self.onTicker
-        self.cbDict['ok_sub_spot_ltc_usdt_ticker'] = self.onTicker
-        self.cbDict['ok_sub_spot_eth_usdt_ticker'] = self.onTicker
-
-        self.cbDict['ok_sub_spot_btc_usdt_depth_20'] = self.onDepth
-        self.cbDict['ok_sub_spot_ltc_usdt_depth_20'] = self.onDepth
-        self.cbDict['ok_sub_spot_eth_usdt_depth_20'] = self.onDepth
-
         self.cbDict['ok_spot_userinfo'] = self.onSpotUserInfo
         self.cbDict['ok_spot_orderinfo'] = self.onSpotOrderInfo
 
         self.cbDict['ok_spot_order'] = self.onSpotTrade
         self.cbDict['ok_spot_cancel_order'] = self.onSpotCancelOrder
-
-        self.cbDict['ok_spot_btc_usdt_balance'] = self.onSpotSubUserInfo
-        self.cbDict['ok_spot_ltc_usdt_balance'] = self.onSpotSubUserInfo
-        self.cbDict['ok_spot_eth_usdt_balance'] = self.onSpotSubUserInfo
-
-        self.cbDict['ok_spot_btc_usdt_order'] = self.onSpotSubTrades
-        self.cbDict['ok_spot_ltc_usdt_order'] = self.onSpotSubTrades
-        self.cbDict['ok_spot_eth_usdt_order'] = self.onSpotSubTrades
-
-        # BTC SPOT
-        self.cbDict['ok_sub_spot_ltc_btc_ticker'] = self.onTicker
-        self.cbDict['ok_sub_spot_eth_btc_ticker'] = self.onTicker
-
-        self.cbDict['ok_sub_spot_ltc_btc_depth_20'] = self.onDepth
-        self.cbDict['ok_sub_spot_eth_btc_depth_20'] = self.onDepth
 
     #----------------------------------------------------------------------
     def onTicker(self, data):
@@ -458,9 +439,9 @@ class Api(vnokex.OkExApi):
         account.gatewayName = self.gatewayName
         account.accountID = self.gatewayName
         account.vtAccountID = account.accountID
-        account.balance = float(funds['free'][self.currency])
-        self.gateway.onAccount(account)    
-        
+        account.balance = float(funds['free']['usdt'])
+        self.gateway.onAccount(account)
+
     #----------------------------------------------------------------------
     def onSpotSubUserInfo(self, data):
         """现货账户资金推送"""
