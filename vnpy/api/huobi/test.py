@@ -15,12 +15,15 @@ def testTrade():
     
     # 查询账户，测试通过
     api.getAccountInfo()
+    sleep(2)
+    api.getBalance()
     
     # 查询委托，测试通过
     #api.getOrders()
     
     # 买入，测试通过
-    #api.buy(7100, 0.0095)
+    # api.buy(1, 0.001, SYMBOL_BTCUSDT)
+    api.cancelOrder("450067754")
     
     # 卖出，测试通过
     #api.sell(7120, 0.0095)
@@ -46,16 +49,12 @@ def testData():
     api.init(0.5, True)
     
     # 订阅成交推送，测试通过
-    #api.subscribeTick(SYMBOL_BTCCNY)
-    
-    # 订阅报价推送，测试通过
-    #api.subscribeQuote(SYMBOL_BTCCNY)
+    api.subscribeTick(SYMBOL_ETHBTC)
 
-    # 订阅深度推送，测试通过
-    data = api.subscribeDepth(SYMBOL_BTCCNY, 1)
+    api.subscribeDepth(SYMBOL_ETHBTC)
 
     # 查询K线数据，测试通过
-    #data = api.getKline(SYMBOL_BTCCNY, PERIOD_1MIN, 100)
+    data = api.getKline(SYMBOL_ETHBTC, PERIOD_1MIN)
     print data
     
     input()
@@ -70,6 +69,6 @@ def testDataWebsocket():
     api.sendDepthDataRequest(SYMBOL_ETHBTC, DEPTH_STEP0)
 
 if __name__ == '__main__':
-    #testTrade()
+    testTrade()
     #testData()
-    testDataWebsocket()
+    #testDataWebsocket()

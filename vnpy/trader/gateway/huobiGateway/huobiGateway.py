@@ -17,6 +17,7 @@ from vnpy.api.huobi import vnhuobi
 from vnpy.trader.vtGateway import *
 from vnpy.trader.vtFunction import getJsonPath
 
+#BTC_USD_SPOT
 SYMBOL_BTCCNY = 'BTCCNY'
 SYMBOL_LTCCNY = 'LTCCNY'
 SYMBOL_BTCUSD = 'BTCUSD'
