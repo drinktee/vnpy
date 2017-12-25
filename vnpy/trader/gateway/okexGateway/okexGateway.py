@@ -69,9 +69,9 @@ ETH_BTC_SPOT = 'ETH_BTC_SPOT'
 
 # 印射字典
 spotSymbolMap = {}
-spotSymbolMap['ltc_usd'] = LTC_USD_SPOT
-spotSymbolMap['btc_usd'] = BTC_USD_SPOT
-spotSymbolMap['eth_usd'] = ETH_USD_SPOT
+spotSymbolMap['ltc_usdt'] = LTC_USD_SPOT
+spotSymbolMap['btc_usdt'] = BTC_USD_SPOT
+spotSymbolMap['eth_usdt'] = ETH_USD_SPOT
 spotSymbolMap['ltc_btc'] = LTC_BTC_SPOT
 spotSymbolMap['eth_btc'] = ETH_BTC_SPOT
 spotSymbolMapReverse = {v: k for k, v in spotSymbolMap.items()}
@@ -132,6 +132,7 @@ class OkexGateway(VtGateway):
     def connect(self):
         """连接"""
         # 载入json文件
+        print self.fileName
         try:
             f = file(self.filePath)
         except IOError:
@@ -155,7 +156,8 @@ class OkexGateway(VtGateway):
             log.logContent = u'连接配置缺少字段，请检查'
             self.onLog(log)
             return            
-        
+
+
         # 初始化接口
         self.leverage = leverage
         self.api.active = True
