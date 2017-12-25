@@ -20,6 +20,7 @@ from vnpy.trader.uiMainWindow import MainWindow
 # 加载底层接口
 from vnpy.trader.gateway import ctpGateway
 from vnpy.trader.gateway import okexGateway
+from  vnpy.trader.gateway.okexGateway.okexGateway import BTC_USD_SPOT
 # 加载上层应用
 from vnpy.trader.app import (riskManager, ctaStrategy, spreadTrading)
 
@@ -39,6 +40,7 @@ def main():
     # 添加交易接口
     # me.addGateway(ctpGateway)
     me.addGateway(okexGateway)
+    me.subscribe(BTC_USD_SPOT, "OKEX")
 
     # 添加上层应用
     me.addApp(riskManager)
