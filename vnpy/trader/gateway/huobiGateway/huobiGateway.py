@@ -18,20 +18,16 @@ from vnpy.trader.vtGateway import *
 from vnpy.trader.vtFunction import getJsonPath
 
 #BTC_USD_SPOT
-SYMBOL_BTCCNY = 'BTCCNY'
-SYMBOL_LTCCNY = 'LTCCNY'
-SYMBOL_BTCUSD = 'BTCUSD'
+BTC_USD_SPOT = 'BTC_USD_SPOT'
+ETH_USD_SPOT = 'ETH_USD_SPOT'
+LTC_USD_SPOT = 'LTC_USD_SPOT'
+
 
 SYMBOL_MAP = {}
-SYMBOL_MAP[(vnhuobi.COINTYPE_BTC, 'cny')] = SYMBOL_BTCCNY
-SYMBOL_MAP[(vnhuobi.COINTYPE_LTC, 'cny')] = SYMBOL_LTCCNY
-SYMBOL_MAP[(vnhuobi.COINTYPE_BTC, 'usd')] = SYMBOL_BTCUSD
+SYMBOL_MAP['btcusdt'] = BTC_USD_SPOT
+SYMBOL_MAP['ethusdt'] = ETH_USD_SPOT
+SYMBOL_MAP['ltcbtc'] = LTC_USD_SPOT
 SYMBOL_MAP_REVERSE = {v: k for k, v in SYMBOL_MAP.items()}
-
-MDSYMBOL_MAP = {}
-MDSYMBOL_MAP['btccny'] = SYMBOL_BTCCNY
-MDSYMBOL_MAP['ltccny'] = SYMBOL_LTCCNY
-MDSYMBOL_MAP['btcusd'] = SYMBOL_BTCUSD
 
 DIRECTION_MAP = {}
 DIRECTION_MAP[1] = DIRECTION_LONG
@@ -60,6 +56,7 @@ class HuobiGateway(VtGateway):
         
         self.tradeApi = HuobiTradeApi(self)
         self.dataApi = HuobiDataApi(self)
+        #self.websocketApi =
         
         self.fileName = self.gatewayName + '_connect.json'
         self.filePath = getJsonPath(self.fileName, __file__)             
@@ -178,6 +175,8 @@ class HuobiTradeApi(vnhuobi.TradeApi):
         self.gateway = gateway
         self.gatewayName = gateway.gatewayName
 
+        self.subscribeSet = set()    # 订阅的币种
+
         self.localID = 0            # 本地委托号
         self.localSystemDict = {}   # key:localID, value:systemID
         self.systemLocalDict = {}   # key:systemID, value:localID
@@ -186,7 +185,8 @@ class HuobiTradeApi(vnhuobi.TradeApi):
         self.cancelDict = {}        # key:localID, value:cancelOrderReq
 
         self.tradeID = 0            # 本地成交号
-    
+
+
     #----------------------------------------------------------------------
     def onError(self, error, req, reqID):
         """错误推送"""
@@ -369,17 +369,7 @@ class HuobiTradeApi(vnhuobi.TradeApi):
         if data['result'] == 'success':
             order.status = STATUS_NOTTRADED
         self.gateway.onOrder(order)
-        
-    #----------------------------------------------------------------------
-    def onBuyMarket(self, data, req, reqID):
-        """市价买入回调"""
-        print data
-        
-    #----------------------------------------------------------------------
-    def onSellMarket(self, data, req, reqID):
-        """市价卖出回调"""
-        print data        
-        
+
     #----------------------------------------------------------------------
     def onCancelOrder(self, data, req, reqID):
         """撤单回调"""
@@ -392,57 +382,7 @@ class HuobiTradeApi(vnhuobi.TradeApi):
 
             del self.workingOrderDict[localID]
             self.gateway.onOrder(order)
-    
-    #----------------------------------------------------------------------
-    def onGetNewDealOrders(self, data, req, reqID):
-        """查询最新成交回调"""
-        print data    
-        
-    #----------------------------------------------------------------------
-    def onGetOrderIdByTradeId(self, data, req, reqID):
-        """通过成交编号查询委托编号回调"""
-        print data    
-        
-    #----------------------------------------------------------------------
-    def onWithdrawCoin(self, data, req, reqID):
-        """提币回调"""
-        print data
-        
-    #----------------------------------------------------------------------
-    def onCancelWithdrawCoin(self, data, req, reqID):
-        """取消提币回调"""
-        print data      
-        
-    #----------------------------------------------------------------------
-    def onGetWithdrawCoinResult(self, data, req, reqID):
-        """查询提币结果回调"""
-        print data           
-        
-    #----------------------------------------------------------------------
-    def onTransfer(self, data, req, reqID):
-        """转账回调"""
-        print data
-        
-    #----------------------------------------------------------------------
-    def onLoan(self, data, req, reqID):
-        """申请杠杆回调"""
-        print data      
-        
-    #----------------------------------------------------------------------
-    def onRepayment(self, data, req, reqID):
-        """归还杠杆回调"""
-        print data    
-    
-    #----------------------------------------------------------------------
-    def onLoanAvailable(self, data, req, reqID):
-        """查询杠杆额度回调"""
-        print data      
-        
-    #----------------------------------------------------------------------
-    def onGetLoans(self, data, req, reqID):
-        """查询杠杆列表"""
-        print data        
-    
+
     #----------------------------------------------------------------------
     def connect(self, accessKey, secretKey, market, debug=False):
         """连接服务器"""
@@ -459,6 +399,10 @@ class HuobiTradeApi(vnhuobi.TradeApi):
             self.getOrders(vnhuobi.COINTYPE_LTC, self.market)
 
     # ----------------------------------------------------------------------
+    def subscribe(self, symbol):
+        self.subscribeSet.add(symbol)
+
+    # ----------------------------------------------------------------------
     def queryWorkingOrders(self):
         """查询活动委托状态"""
         for order in self.workingOrderDict.values():
@@ -471,7 +415,7 @@ class HuobiTradeApi(vnhuobi.TradeApi):
     # ----------------------------------------------------------------------
     def queryAccount(self):
         """查询活动委托状态"""
-        self.getAccountInfo(self.market)
+        self.getAccountInfo()
 
     # ----------------------------------------------------------------------
     def sendOrder(self, req):
@@ -533,6 +477,7 @@ class HuobiTradeApi(vnhuobi.TradeApi):
             self.cancelDict[localID] = req
 
 
+
 ########################################################################
 class HuobiDataApi(vnhuobi.DataApi):
     """行情接口"""
@@ -554,33 +499,11 @@ class HuobiDataApi(vnhuobi.DataApi):
     def onTick(self, data):
         """实时成交推送"""
         print data
-        
-    #----------------------------------------------------------------------
-    def onQuote(self, data):
-        """实时报价推送"""
-        ticker = data['ticker']
-        symbol = MDSYMBOL_MAP[ticker['symbol']]
 
-        if symbol not in self.tickDict:
-            tick = VtTickData()
-            tick.gatewayName = self.gatewayName
-
-            tick.symbol = symbol
-            tick.exchange = EXCHANGE_HUOBI
-            tick.vtSymbol = '.'.join([tick.symbol, tick.exchange])
-            self.tickDict[symbol] = tick
-        else:
-            tick = self.tickDict[symbol]
-
-        tick.highPrice = ticker['high']
-        tick.lowPrice = ticker['low']
-        tick.lastPrice = ticker['last']
-        tick.volume = ticker['vol']
-    
     #----------------------------------------------------------------------
     def onDepth(self, data):
         """实时深度推送"""
-        symbol = MDSYMBOL_MAP[data['symbol']]
+        symbol = SYMBOL_MAP[data['symbol']]
         if symbol not in self.tickDict:
             tick = VtTickData()
             tick.gatewayName = self.gatewayName
@@ -609,60 +532,29 @@ class HuobiDataApi(vnhuobi.DataApi):
         tick.date = now.strftime('%Y%m%d')
 
         self.gateway.onTick(tick)
-        
+
+    #----------------------------------------------------------------------
+    def subscribe(self, symbol):
+        """订阅行情信息"""
+        _symbol = SYMBOL_MAP_REVERSE[symbol]
+        self.subscribeDepth(_symbol)
+
+        contract = VtContractData()
+        contract.gatewayName = self.gatewayName
+        contract.symbol = symbol
+        contract.exchange = EXCHANGE_HUOBI
+        contract.vtSymbol = '.'.join([contract.symbol, contract.exchange])
+        contract.name = u'币币交易'
+        contract.size = 1
+        contract.priceTick = 0.001
+        contract.productClass = PRODUCT_SPOT
+        self.gateway.onContract(contract)
+
+
     #----------------------------------------------------------------------
     def connect(self, interval, market, debug=False):
         """连接服务器"""
         self.market = market
-
         self.init(interval, debug)
-
-        # 订阅行情并推送合约信息
-        if self.market == vnhuobi.MARKETTYPE_CNY:
-            self.subscribeQuote(vnhuobi.SYMBOL_BTCCNY)
-            self.subscribeQuote(vnhuobi.SYMBOL_LTCCNY)
-
-            self.subscribeDepth(vnhuobi.SYMBOL_BTCCNY, 5)
-            self.subscribeDepth(vnhuobi.SYMBOL_LTCCNY, 5)
-
-            contract = VtContractData()
-            contract.gatewayName = self.gatewayName
-            contract.symbol = SYMBOL_BTCCNY
-            contract.exchange = EXCHANGE_HUOBI
-            contract.vtSymbol = '.'.join([contract.symbol, contract.exchange])
-            contract.name = u'人民币现货BTC'
-            contract.size = 1
-            contract.priceTick = 0.01
-            contract.productClass = PRODUCT_SPOT
-            self.gateway.onContract(contract)
-
-            contract = VtContractData()
-            contract.gatewayName = self.gatewayName
-            contract.symbol = SYMBOL_LTCCNY
-            contract.exchange = EXCHANGE_HUOBI
-            contract.vtSymbol = '.'.join([contract.symbol, contract.exchange])
-            contract.name = u'人民币现货LTC'
-            contract.size = 1
-            contract.priceTick = 0.01
-            contract.productClass = PRODUCT_SPOT
-            self.gateway.onContract(contract)
-        else:
-            self.subscribeQuote(vnhuobi.SYMBOL_BTCUSD)
-
-            self.subscribeDepth(vnhuobi.SYMBOL_BTCUSD)
-
-            contract = VtContractData()
-            contract.gatewayName = self.gatewayName
-            contract.symbol = SYMBOL_BTCUSD
-            contract.exchange = EXCHANGE_HUOBI
-            contract.vtSymbol = '.'.join([contract.symbol, contract.exchange])
-            contract.name = u'美元现货BTC'
-            contract.size = 1
-            contract.priceTick = 0.01
-            contract.productClass = PRODUCT_SPOT
-            self.gateway.onContract(contract)
-    
-    
-    
 
 
