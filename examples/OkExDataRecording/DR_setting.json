@@ -1,0 +1,21 @@
+{
+    "working": true,
+
+    "tick":
+    [
+        ["BTC_USD_SPOT", "OKEX"],
+        ["LTC_USD_SPOT", "OKEX"],
+        ["ETH_USD_SPOT", "OKEX"]
+    ],
+
+    "bar":
+    [
+        ["BTC_USD_SPOT", "OKEX"],
+        ["LTC_USD_SPOT", "OKEX"],
+        ["ETH_USD_SPOT", "OKEX"]
+    ],
+
+    "active":
+    {
+    }
+}

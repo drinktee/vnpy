@@ -1,0 +1,7 @@
+{
+    "accessKey": "",
+    "secretKey": "",
+    "interval": 0.5,
+    "market": "cny",
+    "debug": false
+}
