@@ -124,8 +124,13 @@ class OkexGateway(VtGateway):
         
         self.leverage = 0
         self.connected = False
-        
+
         self.fileName = self.gatewayName + '_connect.json'
+
+        log = VtLogData()
+        log.gatewayName = self.gatewayName
+        log.logContent = self.fileName
+        self.onLog(log)
         self.filePath = getJsonPath(self.fileName, __file__)             
         
     #----------------------------------------------------------------------
@@ -165,22 +170,13 @@ class OkexGateway(VtGateway):
         
         log = VtLogData()
         log.gatewayName = self.gatewayName
-        log.logContent = u'接口初始化成功' + host
+        log.logContent = u'接口初始化成功'
         self.onLog(log)
         
         # 启动查询
         self.initQuery()
-
-        log = VtLogData()
-        log.gatewayName = self.gatewayName
-        log.logContent = u'接口初始化成功2'
-        self.onLog(log)
         self.startQuery()
 
-        log = VtLogData()
-        log.gatewayName = self.gatewayName
-        log.logContent = u'接口初始化成功3'
-        self.onLog(log)
 
 
     
