@@ -132,7 +132,7 @@ class OkexGateway(VtGateway):
     def connect(self):
         """连接"""
         # 载入json文件
-        print self.fileName
+        print 'test'
         try:
             f = file(self.filePath)
         except IOError:
