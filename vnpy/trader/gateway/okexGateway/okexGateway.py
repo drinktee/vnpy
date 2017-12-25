@@ -322,6 +322,7 @@ class Api(vnokex.OkExApi):
         
         # 连接后查询账户和委托数据
         self.login()
+        self.spotUserInfo()
 
     #----------------------------------------------------------------------
     def writeLog(self, content):

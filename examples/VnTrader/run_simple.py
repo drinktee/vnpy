@@ -40,7 +40,7 @@ def main():
     # 添加交易接口
     # me.addGateway(ctpGateway)
     me.addGateway(okexGateway)
-    me.subscribe(BTC_USD_SPOT, "OKEX")
+    #me.subscribe(BTC_USD_SPOT, "OKEX")
 
     # 添加上层应用
     me.addApp(riskManager)
