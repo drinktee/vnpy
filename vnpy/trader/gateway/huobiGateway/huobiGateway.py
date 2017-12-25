@@ -21,12 +21,13 @@ from vnpy.trader.vtFunction import getJsonPath
 BTC_USD_SPOT = 'BTC_USD_SPOT'
 ETH_USD_SPOT = 'ETH_USD_SPOT'
 LTC_USD_SPOT = 'LTC_USD_SPOT'
-
+ETH_BTC_SPOT = 'ETH_BTC_SPOT'
 
 SYMBOL_MAP = {}
 SYMBOL_MAP['btcusdt'] = BTC_USD_SPOT
 SYMBOL_MAP['ethusdt'] = ETH_USD_SPOT
-SYMBOL_MAP['ltcbtc'] = LTC_USD_SPOT
+SYMBOL_MAP['ltcusdt'] = LTC_USD_SPOT
+SYMBOL_MAP['ethbtc'] = ETH_BTC_SPOT
 SYMBOL_MAP_REVERSE = {v: k for k, v in SYMBOL_MAP.items()}
 
 DIRECTION_MAP = {}
@@ -200,12 +201,19 @@ class HuobiTradeApi(vnhuobi.TradeApi):
     def onGetAccountInfo(self, data, req, reqID):
         """查询账户回调"""
         # 推送账户数据
+        for e in data['data']['list']:
+            if e['currency'] == 'usdt':
+                pass
+
+
         account = VtAccountData()
         account.gatewayName = self.gatewayName
         account.accountID = 'HUOBI'
         account.vtAccountID = '.'.join([account.accountID, self.gatewayName])
         account.balance = data['net_asset']
         self.gateway.onAccount(account)
+
+
         
         # 推送持仓数据
         if self.market == 'cny':
