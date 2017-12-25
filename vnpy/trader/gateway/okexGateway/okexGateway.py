@@ -165,12 +165,24 @@ class OkexGateway(VtGateway):
         
         log = VtLogData()
         log.gatewayName = self.gatewayName
-        log.logContent = u'接口初始化成功'
+        log.logContent = u'接口初始化成功' + host
         self.onLog(log)
         
         # 启动查询
         self.initQuery()
+
+        log = VtLogData()
+        log.gatewayName = self.gatewayName
+        log.logContent = u'接口初始化成功2'
+        self.onLog(log)
         self.startQuery()
+
+        log = VtLogData()
+        log.gatewayName = self.gatewayName
+        log.logContent = u'接口初始化成功3'
+        self.onLog(log)
+
+
     
     #----------------------------------------------------------------------
     def subscribe(self, subscribeReq):
