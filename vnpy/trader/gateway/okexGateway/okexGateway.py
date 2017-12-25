@@ -178,7 +178,7 @@ class OkexGateway(VtGateway):
     #----------------------------------------------------------------------
     def subscribe(self, subscribeReq):
         """订阅行情"""
-        self.api.subscribe(subscribeReq)
+        self.api.subscribe(subscribeReq.symbol)
         
     #----------------------------------------------------------------------
     def sendOrder(self, orderReq):
