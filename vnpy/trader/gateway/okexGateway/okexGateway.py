@@ -126,11 +126,6 @@ class OkexGateway(VtGateway):
         self.connected = False
 
         self.fileName = self.gatewayName + '_connect.json'
-
-        log = VtLogData()
-        log.gatewayName = self.gatewayName
-        log.logContent = self.fileName
-        self.onLog(log)
         self.filePath = getJsonPath(self.fileName, __file__)             
         
     #----------------------------------------------------------------------
@@ -183,7 +178,7 @@ class OkexGateway(VtGateway):
     #----------------------------------------------------------------------
     def subscribe(self, subscribeReq):
         """订阅行情"""
-        pass
+        self.api.subscribe(subscribeReq)
         
     #----------------------------------------------------------------------
     def sendOrder(self, orderReq):
