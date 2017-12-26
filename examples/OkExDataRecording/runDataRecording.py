@@ -43,13 +43,14 @@ def runChildProcess():
     me = MainEngine(ee)
     me.addGateway(okexGateway)
     #me.addGateway(huobiGateway)
+    me.connect('OKEX')
     me.addApp(dataRecorder)
     printLog(u'主引擎创建成功')
     
     ee.register(EVENT_LOG, processLogEvent)
     printLog(u'注册日志事件监听')
     
-    me.connect('OKEX')
+
     #me.connect('HUOBI')
     printLog(u'连接CTP接口')
     
