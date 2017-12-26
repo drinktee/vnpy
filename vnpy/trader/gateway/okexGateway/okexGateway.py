@@ -338,6 +338,7 @@ class Api(vnokex.OkExApi):
         timeout = time.time() + 5
         while True:
             if  time.time() > timeout:
+                self.writeLog(u'订阅合约超时')
                 break
             if self.gateway.connected is True:
                 self.subscribeSpotDepth(spotSymbolMapReverse[symbol], DEPTH_20)
@@ -348,7 +349,7 @@ class Api(vnokex.OkExApi):
                 self.cbDict['ok_spot_%s_order' % (spotSymbolMapReverse[symbol])] = self.onSpotSubTrades
                 self.writeLog(u'订阅合约 %s 成功'%symbol)
                 break
-        self.writeLog(u'订阅合约超时')
+
 
     #----------------------------------------------------------------------
     def initCallback(self):
