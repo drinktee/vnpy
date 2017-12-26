@@ -109,6 +109,7 @@ fundsSymbolMap[ETH_BTC_SPOT] = 'eth'
 fundsSymbolMap[ETH_USD_SPOT] = 'eth'
 fundsSymbolMap[LTC_BTC_SPOT] = 'ltc'
 fundsSymbolMap[LTC_USD_SPOT] = 'ltc'
+fundsSymbolMap[BTC_USD_SPOT] = 'btc'
 
 
 ########################################################################
@@ -279,8 +280,9 @@ class Api(vnokex.OkExApi):
         """信息推送""" 
         data = self.readData(evt)[0]
         channel = data['channel']
-        callback = self.cbDict[channel]
-        callback(data)
+        if channel in self.cbDict:
+            callback = self.cbDict[channel]
+            callback(data)
         
     #----------------------------------------------------------------------
     def onError(self, ws, evt):
