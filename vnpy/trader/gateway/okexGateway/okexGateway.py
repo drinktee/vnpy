@@ -16,7 +16,7 @@ from copy import copy
 from threading import Condition
 from Queue import Queue
 from threading import Thread
-from time import sleep
+import time
 
 from vnpy.api.okex import vnokex
 from vnpy.api.okex.vnokex import *
@@ -334,12 +334,19 @@ class Api(vnokex.OkExApi):
 
     def subscribe(self, subscribeReq):
         """订阅行情信息"""
-        self.subscribeSpotDepth(spotSymbolMapReverse[subscribeReq], DEPTH_20)
-        self.symbolSet.add(fundsSymbolMap[subscribeReq])
-        self.cbDict['ok_sub_spot_%s_ticker' % (spotSymbolMapReverse[subscribeReq])] = self.onTicker
-        self.cbDict['ok_sub_spot_%s_depth_20' % (spotSymbolMapReverse[subscribeReq])] = self.onDepth
-        self.cbDict['ok_spot_%s_balance' % (spotSymbolMapReverse[subscribeReq])] = self.onSpotSubUserInfo
-        self.cbDict['ok_spot_%s_order' % (spotSymbolMapReverse[subscribeReq])] = self.onSpotSubTrades
+        timeout = time.time() + 5  # 5 minutes from now
+        while True:
+            if  time.time() > timeout:
+                self.writeLog(u'订阅合约超时')
+                break
+            if self.gateway.connected is True:
+                symbol = subscribeReq.symbol
+                self.subscribeSpotDepth(spotSymbolMapReverse[symbol], DEPTH_20)
+                self.symbolSet.add(fundsSymbolMap[symbol])
+                self.cbDict['ok_sub_spot_%s_ticker' % (spotSymbolMapReverse[symbol])] = self.onTicker
+                self.cbDict['ok_sub_spot_%s_depth_20' % (spotSymbolMapReverse[symbol])] = self.onDepth
+                self.cbDict['ok_spot_%s_balance' % (spotSymbolMapReverse[symbol])] = self.onSpotSubUserInfo
+                self.cbDict['ok_spot_%s_order' % (spotSymbolMapReverse[symbol])] = self.onSpotSubTrades
 
     #----------------------------------------------------------------------
     def initCallback(self):
