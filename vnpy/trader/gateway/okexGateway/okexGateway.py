@@ -132,7 +132,6 @@ class OkexGateway(VtGateway):
     def connect(self):
         """连接"""
         # 载入json文件
-        print 'test'
         try:
             f = file(self.filePath)
         except IOError:
@@ -332,15 +331,14 @@ class Api(vnokex.OkExApi):
         log.logContent = content
         self.gateway.onLog(log)
 
-    def subscribe(self, subscribeReq):
+    def subscribe(self, symbol):
         """订阅行情信息"""
-        timeout = time.time() + 5  # 5 minutes from now
+        timeout = time.time() + 5
         while True:
             if  time.time() > timeout:
                 self.writeLog(u'订阅合约超时')
                 break
             if self.gateway.connected is True:
-                symbol = subscribeReq.symbol
                 self.subscribeSpotDepth(spotSymbolMapReverse[symbol], DEPTH_20)
                 self.symbolSet.add(fundsSymbolMap[symbol])
                 self.cbDict['ok_sub_spot_%s_ticker' % (spotSymbolMapReverse[symbol])] = self.onTicker
