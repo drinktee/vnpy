@@ -686,7 +686,8 @@ class TradingWidget(QtWidgets.QFrame):
                     EXCHANGE_NYMEX,
                     EXCHANGE_LME,
                     EXCHANGE_GLOBEX,
-                    EXCHANGE_IDEALPRO]
+                    EXCHANGE_IDEALPRO,
+                    EXCHANGE_OKEX]
     
     currencyList = [CURRENCY_NONE,
                     CURRENCY_CNY,
@@ -927,7 +928,10 @@ class TradingWidget(QtWidgets.QFrame):
             gatewayName = contract.gatewayName
             self.lineName.setText(contract.name)
             exchange = contract.exchange    # 保证有交易所代码
-            
+
+        print symbol
+        print exchange
+        print gatewayName
         # 清空价格数量
         self.spinPrice.setValue(0)
         self.spinVolume.setValue(0)
