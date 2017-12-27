@@ -929,9 +929,6 @@ class TradingWidget(QtWidgets.QFrame):
             self.lineName.setText(contract.name)
             exchange = contract.exchange    # 保证有交易所代码
 
-        print symbol
-        print exchange
-        print gatewayName
         # 清空价格数量
         self.spinPrice.setValue(0)
         self.spinVolume.setValue(0)
@@ -983,7 +980,8 @@ class TradingWidget(QtWidgets.QFrame):
     def updateTick(self, event):
         """更新行情"""
         tick = event.dict_['data']
-
+        print tick.vtSymbol
+        print self.symbol
         if tick.vtSymbol == self.symbol:
             if not self.checkFixed.isChecked():
                 self.spinPrice.setValue(tick.lastPrice)
