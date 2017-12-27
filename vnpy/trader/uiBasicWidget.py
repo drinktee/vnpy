@@ -980,8 +980,6 @@ class TradingWidget(QtWidgets.QFrame):
     def updateTick(self, event):
         """更新行情"""
         tick = event.dict_['data']
-        print tick.vtSymbol
-        print self.symbol
         if tick.vtSymbol == self.symbol:
             if not self.checkFixed.isChecked():
                 self.spinPrice.setValue(tick.lastPrice)
