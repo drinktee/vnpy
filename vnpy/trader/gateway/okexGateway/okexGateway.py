@@ -259,7 +259,8 @@ class Api(vnokex.OkExApi):
         
         self.gateway = gateway                  # gateway对象
         self.gatewayName = gateway.gatewayName  # gateway对象名称
-        
+        self.exchange = EXCHANGE_OKEX
+
         self.active = False             # 若为True则会在断线后自动重连
         self.subscribedSymbols = set()  # 已经订阅的产品
 
@@ -380,7 +381,7 @@ class Api(vnokex.OkExApi):
         if symbol not in self.tickDict:
             tick = VtTickData()
             tick.symbol = symbol
-            tick.vtSymbol = symbol
+            tick.vtSymbol = '.'.join([symbol, self.exchange])
             tick.gatewayName = self.gatewayName
             self.tickDict[symbol] = tick
         else:
@@ -408,7 +409,7 @@ class Api(vnokex.OkExApi):
         if symbol not in self.tickDict:
             tick = VtTickData()
             tick.symbol = symbol
-            tick.vtSymbol = symbol
+            tick.vtSymbol = '.'.join([symbol, self.exchange])
             tick.gatewayName = self.gatewayName
             self.tickDict[symbol] = tick
         else:
@@ -449,7 +450,7 @@ class Api(vnokex.OkExApi):
                 pos.gatewayName = self.gatewayName
 
                 pos.symbol = symbol
-                pos.vtSymbol = symbol
+                pos.vtSymbol = '.'.join([symbol, self.exchange])
                 pos.vtPositionName = symbol
                 pos.direction = DIRECTION_NET
 
@@ -482,7 +483,7 @@ class Api(vnokex.OkExApi):
                 pos.gatewayName = self.gatewayName
                 
                 pos.symbol = symbol
-                pos.vtSymbol = symbol
+                pos.vtSymbol = '.'.join([symbol, self.exchange])
                 pos.vtPositionName = symbol
                 pos.direction = DIRECTION_NET
                 
@@ -508,7 +509,7 @@ class Api(vnokex.OkExApi):
             order.gatewayName = self.gatewayName
             
             order.symbol = spotSymbolMap[rawData['symbol']]
-            order.vtSymbol = order.symbol
+            order.vtSymbol = '.'.join([order.symbol, self.exchange])
     
             order.orderID = localNo
             order.vtOrderID = '.'.join([self.gatewayName, order.orderID])
@@ -532,7 +533,7 @@ class Api(vnokex.OkExApi):
             trade.gatewayName = self.gatewayName
             
             trade.symbol = spotSymbolMap[rawData['symbol']]
-            trade.vtSymbol = order.symbol            
+            trade.vtSymbol = '.'.join([order.symbol, self.exchange])
             
             trade.tradeID = str(rawData['id'])
             trade.vtTradeID = '.'.join([self.gatewayName, trade.tradeID])
@@ -567,7 +568,7 @@ class Api(vnokex.OkExApi):
                 order.gatewayName = self.gatewayName
                 
                 order.symbol = spotSymbolMap[d['symbol']]
-                order.vtSymbol = order.symbol
+                order.vtSymbol = '.'.join([order.symbol, self.exchange])
     
                 order.orderID = localNo
                 order.vtOrderID = '.'.join([self.gatewayName, order.orderID])
@@ -590,7 +591,7 @@ class Api(vnokex.OkExApi):
         """生成合约"""
         new = copy(contract)
         new.symbol = symbol
-        new.vtSymbol = symbol
+        new.vtSymbol = '.'.join([new.symbol, self.exchange])
         new.name = symbol
         return new
 
