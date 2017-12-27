@@ -398,13 +398,14 @@ class HuobiTradeApi(vnhuobi.TradeApi):
         self.DEBUG = debug
         
         self.init(accessKey, secretKey)
+        self.getAccountInfo()
 
         # 查询未成交委托
-        self.getOrders(vnhuobi.COINTYPE_BTC, self.market)
-
-        if self.market == vnhuobi.MARKETTYPE_CNY:
-            # 只有人民币市场才有莱特币
-            self.getOrders(vnhuobi.COINTYPE_LTC, self.market)
+        # self.getOrders(vnhuobi.COINTYPE_BTC, self.market)
+        #
+        # if self.market == vnhuobi.MARKETTYPE_CNY:
+        #     # 只有人民币市场才有莱特币
+        #     self.getOrders(vnhuobi.COINTYPE_LTC, self.market)
 
     # ----------------------------------------------------------------------
     def subscribe(self, symbol):
@@ -502,7 +503,13 @@ class HuobiDataApi(vnhuobi.DataApi):
 
         self.tickDict = {}      # key:symbol, value:tick
 
-    
+    def readData(self, evt):
+        """解压缩推送收到的数据"""
+        # 通过json解析字符串
+        data = json.loads(evt)
+
+        return data
+
     #----------------------------------------------------------------------
     def onTick(self, data):
         """实时成交推送"""
@@ -511,7 +518,10 @@ class HuobiDataApi(vnhuobi.DataApi):
     #----------------------------------------------------------------------
     def onDepth(self, data):
         """实时深度推送"""
-        symbol = SYMBOL_MAP[data['symbol']]
+        data = self.readData(data)
+        data = data['tick']
+        chsymbol = data['ch'].split('.')[1]
+        symbol = SYMBOL_MAP[chsymbol]
         if symbol not in self.tickDict:
             tick = VtTickData()
             tick.gatewayName = self.gatewayName
