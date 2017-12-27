@@ -281,10 +281,13 @@ class Api(vnokex.OkExApi):
     def onMessage(self, ws, evt):
         """信息推送""" 
         data = self.readData(evt)[0]
-        channel = data['channel']
-        if channel in self.cbDict:
-            callback = self.cbDict[channel]
-            callback(data)
+	try:
+            channel = data['channel']
+            if channel in self.cbDict:
+               callback = self.cbDict[channel]
+               callback(data)
+        except:
+            print data
         
     #----------------------------------------------------------------------
     def onError(self, ws, evt):
