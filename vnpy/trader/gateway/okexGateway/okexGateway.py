@@ -261,6 +261,7 @@ class Api(vnokex.OkExApi):
         self.gatewayName = gateway.gatewayName  # gateway对象名称
         
         self.active = False             # 若为True则会在断线后自动重连
+        self.subscribedSymbols = set()  # 已经订阅的产品
 
         self.symbolSet = set()
         self.cbDict = {}
@@ -325,6 +326,16 @@ class Api(vnokex.OkExApi):
         self.login()
         self.spotUserInfo()
 
+        for subscribeReq in self.subscribedSymbols:
+            symbol = subscribeReq.symbol
+            self.subscribeSpotDepth(spotSymbolMapReverse[symbol], DEPTH_20)
+            self.symbolSet.add(fundsSymbolMap[symbol])
+            self.cbDict['ok_sub_spot_%s_ticker' % (spotSymbolMapReverse[symbol])] = self.onTicker
+            self.cbDict['ok_sub_spot_%s_depth_20' % (spotSymbolMapReverse[symbol])] = self.onDepth
+            self.cbDict['ok_spot_%s_balance' % (spotSymbolMapReverse[symbol])] = self.onSpotSubUserInfo
+            self.cbDict['ok_spot_%s_order' % (spotSymbolMapReverse[symbol])] = self.onSpotSubTrades
+            self.writeLog(u'订阅合约 %s 成功' % symbol)
+
     #----------------------------------------------------------------------
     def writeLog(self, content):
         """快速记录日志"""
@@ -333,25 +344,21 @@ class Api(vnokex.OkExApi):
         log.logContent = content
         self.gateway.onLog(log)
 
-    def subscribe(self, symbol):
+    def subscribe(self, subscribeReq):
         """订阅行情信息"""
-        timeout = time.time() + 5
-        while True:
-            if  time.time() > timeout:
-                self.writeLog(u'订阅合约超时')
-                break
-            if self.gateway.connected is True:
-                self.subscribeSpotDepth(spotSymbolMapReverse[symbol], DEPTH_20)
-                self.symbolSet.add(fundsSymbolMap[symbol])
-                self.cbDict['ok_sub_spot_%s_ticker' % (spotSymbolMapReverse[symbol])] = self.onTicker
-                self.cbDict['ok_sub_spot_%s_depth_20' % (spotSymbolMapReverse[symbol])] = self.onDepth
-                self.cbDict['ok_spot_%s_balance' % (spotSymbolMapReverse[symbol])] = self.onSpotSubUserInfo
-                self.cbDict['ok_spot_%s_order' % (spotSymbolMapReverse[symbol])] = self.onSpotSubTrades
-                self.writeLog(u'订阅合约 %s 成功'%symbol)
-                break
+        if self.gateway.connected:
+            symbol = subscribeReq.symbol
+            self.subscribeSpotDepth(spotSymbolMapReverse[symbol], DEPTH_20)
+            self.symbolSet.add(fundsSymbolMap[symbol])
+            self.cbDict['ok_sub_spot_%s_ticker' % (spotSymbolMapReverse[symbol])] = self.onTicker
+            self.cbDict['ok_sub_spot_%s_depth_20' % (spotSymbolMapReverse[symbol])] = self.onDepth
+            self.cbDict['ok_spot_%s_balance' % (spotSymbolMapReverse[symbol])] = self.onSpotSubUserInfo
+            self.cbDict['ok_spot_%s_order' % (spotSymbolMapReverse[symbol])] = self.onSpotSubTrades
+            self.writeLog(u'订阅合约 %s 成功' % symbol)
+        self.subscribedSymbols.add(subscribeReq)
 
 
-    #----------------------------------------------------------------------
+    #---------------------------------------------------------------------
     def initCallback(self):
         """初始化回调函数"""
         # USD_SPOT
