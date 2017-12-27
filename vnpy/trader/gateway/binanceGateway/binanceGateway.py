@@ -1,14 +1,43 @@
 # encoding: utf-8
+
 from vnpy.trader.vtGateway import *
 from vnpy.trader.vtFunction import getJsonPath
 
-from vnpy.api.binance import vnbinance
-import os
+from vnpy.api.binan import vnbinance
+
 import json
+
+# BTC_USD_SPOT
+
+BTC_USD_SPOT = 'BTC_USD_SPOT'
+ETH_USD_SPOT = 'ETH_USD_SPOT'
+LTC_USD_SPOT = 'LTC_USD_SPOT'
+ETH_BTC_SPOT = 'ETH_BTC_SPOT'
+
+SYMBOL_MAP = {}
+SYMBOL_MAP['btcusdt'] = BTC_USD_SPOT
+SYMBOL_MAP['ethusdt'] = ETH_USD_SPOT
+SYMBOL_MAP['ltcusdt'] = LTC_USD_SPOT
+SYMBOL_MAP['ethbtc'] = ETH_BTC_SPOT
+SYMBOL_MAP_REVERSE = {v: k for k, v in SYMBOL_MAP.items()}
+
+DIRECTION_MAP = {}
+DIRECTION_MAP[1] = DIRECTION_LONG
+DIRECTION_MAP[2] = DIRECTION_SHORT
+
+STATUS_MAP = {}
+STATUS_MAP[0] = STATUS_NOTTRADED
+STATUS_MAP[1] = STATUS_PARTTRADED
+STATUS_MAP[2] = STATUS_ALLTRADED
+STATUS_MAP[3] = STATUS_CANCELLED
+STATUS_MAP[5] = STATUS_UNKNOWN
+STATUS_MAP[7] = STATUS_UNKNOWN
+
+
 class BinanceGateway(VtGateway):
     def __init__(self, eventEngine, gatewayName):
         super(BinanceGateway, self).__init__(eventEngine, gatewayName)
-        self.market = 'cny'
+        self.market = 'USDT'
         self.tradeApi = BinanceTradeApi(self)
         self.fileName = self.gatewayName + '_connect.json'
         self.filePath = getJsonPath(self.fileName, __file__)
@@ -51,7 +80,6 @@ class BinanceGateway(VtGateway):
         self.initQuery()
         self.startQuery()
 
-
     def writeLog(self, content):
         """发出日志"""
         log = VtLogData()
@@ -59,17 +87,43 @@ class BinanceGateway(VtGateway):
         log.logContent = content
         self.onLog(log)
 
+    def subscribe(self, subscribeReq):
+        """订阅行情，自动订阅全部行情，无需实现"""
+        pass
 
+    def sendOrder(self, orderReq):
+        """发单"""
+        self.tradeApi.sendOrder(orderReq)
 
+    def cancelOrder(self, cancelOrderReq):
+        """撤单"""
+        self.tradeApi.cancel(cancelOrderReq)
 
+    def qryAccount(self):
+        """查询账户资金"""
+        pass
 
-    #----------------------------------------------------------------------
+    def qryPosition(self):
+        """查询持仓"""
+        pass
+
+    def close(self):
+        """关闭"""
+        self.tradeApi.exit()
+        self.dataApi.exit()
+
     def initQuery(self):
         """初始化连续查询"""
         if self.qryEnabled:
-            self.qryFunctionList = [self.tradeApi.queryWorkingOrders, self.tradeApi.queryAccount]
+            self.qryFunctionList = [
+                self.tradeApi.queryWorkingOrders, self.tradeApi.queryAccount
+            ]
             self.startQuery()
-            # ----------------------------------------------------------------------
+
+    def query(self, event):
+        """注册到事件处理引擎上的查询函数"""
+        for function in self.qryFunctionList:
+            function()
 
     def startQuery(self):
         """启动连续查询"""
@@ -80,39 +134,28 @@ class BinanceGateway(VtGateway):
         """设置是否要启动循环查询"""
         self.qryEnabled = qryEnabled
 
-    def query(self, event):
-        """注册到事件处理引擎上的查询函数"""
-        for function in self.qryFunctionList:
-            function()
 
-
-
-
-########################################################################
 class BinanceTradeApi(vnbinance.TradeApi):
     """交易接口"""
 
-    #----------------------------------------------------------------------
     def __init__(self, gateway):
         """Constructor"""
         super(BinanceTradeApi, self).__init__()
-        
+
         self.gateway = gateway
         self.gatewayName = gateway.gatewayName
 
-        self.subscribeSet = set()    # 订阅的币种
+        self.subscribeSet = set()  # 订阅的币种
 
-        self.localID = 0            # 本地委托号
-        self.localSystemDict = {}   # key:localID, value:systemID
-        self.systemLocalDict = {}   # key:systemID, value:localID
+        self.localID = 0  # 本地委托号
+        self.localSystemDict = {}  # key:localID, value:systemID
+        self.systemLocalDict = {}  # key:systemID, value:localID
         self.workingOrderDict = {}  # key:localID, value:order
-        self.reqLocalDict = {}      # key:reqID, value:localID
-        self.cancelDict = {}        # key:localID, value:cancelOrderReq
+        self.reqLocalDict = {}  # key:reqID, value:localID
+        self.cancelDict = {}  # key:localID, value:cancelOrderReq
 
-        self.tradeID = 0            # 本地成交号
+        self.tradeID = 0  # 本地成交号
 
-
-    #----------------------------------------------------------------------
     def onError(self, error, req, reqID):
         """错误推送"""
         err = VtErrorData()
@@ -121,14 +164,12 @@ class BinanceTradeApi(vnbinance.TradeApi):
         err.errorTime = datetime.now().strftime('%H:%M:%S')
         self.gateway.onError(err)
 
-    #----------------------------------------------------------------------
     def onGetAccountInfo(self, data, req, reqID):
         """查询账户回调"""
         # 推送账户数据
         for e in data['data']['list']:
             if e['currency'] == 'usdt':
                 pass
-
 
         account = VtAccountData()
         account.gatewayName = self.gatewayName
@@ -137,8 +178,6 @@ class BinanceTradeApi(vnbinance.TradeApi):
         account.balance = data['net_asset']
         self.gateway.onAccount(account)
 
-
-        
         # 推送持仓数据
         if self.market == 'cny':
             posCny = VtPositionData()
@@ -150,7 +189,7 @@ class BinanceTradeApi(vnbinance.TradeApi):
             posCny.position = data['available_cny_display']
             posCny.frozen = data['frozen_cny_display']
             self.gateway.onPosition(posCny)
-            
+
             posLtc = VtPositionData()
             posLtc.gatewayName = self.gatewayName
             posLtc.symbol = 'LTC'
@@ -169,8 +208,8 @@ class BinanceTradeApi(vnbinance.TradeApi):
             posUsd.vtPositionName = posUsd.vtSymbol
             posUsd.position = data['available_usd_display']
             posUsd.frozen = data['frozen_usd_display']
-            self.gateway.onPosition(posUsd)     
-            
+            self.gateway.onPosition(posUsd)
+
         posBtc = VtPositionData()
         posBtc.gatewayName = self.gatewayName
         posBtc.symbol = 'BTC'
@@ -179,9 +218,8 @@ class BinanceTradeApi(vnbinance.TradeApi):
         posBtc.vtPositionName = posBtc.vtSymbol
         posBtc.position = data['available_btc_display']
         posBtc.frozen = data['frozen_btc_display']
-        self.gateway.onPosition(posBtc)        
-    
-    #----------------------------------------------------------------------
+        self.gateway.onPosition(posBtc)
+
     def onGetOrders(self, data, req, reqID):
         """查询委托回调"""
         for d in data:
@@ -192,11 +230,11 @@ class BinanceTradeApi(vnbinance.TradeApi):
             params = req['params']
             coin = params['coin_type']
             order.symbol = SYMBOL_MAP[(coin, self.market)]
-            order.exchange = EXCHANGE_HUOBI
+            order.exchange = EXCHANGE_BINANCE
             order.vtSymbol = '.'.join([order.symbol, order.exchange])
 
             # 委托号
-            systemID = d['id']
+            systemID = d['orderId']
             self.localID += 1
             localID = str(self.localID)
             self.systemLocalDict[systemID] = localID
@@ -207,10 +245,10 @@ class BinanceTradeApi(vnbinance.TradeApi):
             # 其他信息
             order.direction = DIRECTION_MAP[d['type']]
             order.offset = OFFSET_NONE
-            order.price = float(d['order_price'])
-            order.totalVolume = float(d['order_amount'])
-            order.tradedVolume = float(d['processed_amount'])
-            order.orderTime = d['order_time']
+            order.price = float(d['price'])
+            order.totalVolume = float(d['origQty'])
+            order.tradedVolume = float(d['executedQty'])
+            order.orderTime = d['time']
 
             # 委托状态
             if order.tradedVolume == 0:
@@ -222,7 +260,6 @@ class BinanceTradeApi(vnbinance.TradeApi):
             self.workingOrderDict[localID] = order
             self.gateway.onOrder(order)
 
-    #----------------------------------------------------------------------
     def onOrderInfo(self, data, req, reqID):
         """委托详情回调"""
         systemID = data['id']
@@ -259,10 +296,10 @@ class BinanceTradeApi(vnbinance.TradeApi):
         if newTradeVolume:
             self.gateway.onOrder(order)
 
-        if order.status == STATUS_ALLTRADED or order.status == STATUS_CANCELLED:
+        if order.status == STATUS_ALLTRADED \
+                or order.status == STATUS_CANCELLED:
             del self.workingOrderDict[order.orderID]
 
-    #----------------------------------------------------------------------
     def onBuy(self, data, req, reqID):
         """买入回调"""
         localID = self.reqLocalDict[reqID]
@@ -281,8 +318,7 @@ class BinanceTradeApi(vnbinance.TradeApi):
         if data['result'] == 'success':
             order.status = STATUS_NOTTRADED
         self.gateway.onOrder(order)
-        
-    #----------------------------------------------------------------------
+
     def onSell(self, data, req, reqID):
         """卖出回调"""
         localID = self.reqLocalDict[reqID]
@@ -302,7 +338,6 @@ class BinanceTradeApi(vnbinance.TradeApi):
             order.status = STATUS_NOTTRADED
         self.gateway.onOrder(order)
 
-    #----------------------------------------------------------------------
     def onCancelOrder(self, data, req, reqID):
         """撤单回调"""
         if data['result'] == 'success':
@@ -315,26 +350,19 @@ class BinanceTradeApi(vnbinance.TradeApi):
             del self.workingOrderDict[localID]
             self.gateway.onOrder(order)
 
-    #----------------------------------------------------------------------
     def connect(self, accessKey, secretKey, market, debug=False):
         """连接服务器"""
         self.market = market
         self.DEBUG = debug
-        
+
         self.init(accessKey, secretKey)
 
         # 查询未成交委托
-        self.getOrders(vnhuobi.COINTYPE_BTC, self.market)
+        self.getOrders(vnbinance.COINTYPE_BTC, self.market)
 
-        if self.market == vnhuobi.MARKETTYPE_CNY:
-            # 只有人民币市场才有莱特币
-            self.getOrders(vnhuobi.COINTYPE_LTC, self.market)
-
-    # ----------------------------------------------------------------------
     def subscribe(self, symbol):
         self.subscribeSet.add(symbol)
 
-    # ----------------------------------------------------------------------
     def queryWorkingOrders(self):
         """查询活动委托状态"""
         for order in self.workingOrderDict.values():
@@ -365,9 +393,11 @@ class BinanceTradeApi(vnbinance.TradeApi):
         coin, market = SYMBOL_MAP_REVERSE[req.symbol]
 
         if req.direction == DIRECTION_LONG:
-            reqID = self.buy(req.price, req.volume, coinType=coin, market=self.market)
+            reqID = self.buy(
+                req.price, req.volume, coinType=coin, market=self.market)
         else:
-            reqID = self.sell(req.price, req.volume, coinType=coin, market=self.market)
+            reqID = self.sell(
+                req.price, req.volume, coinType=coin, market=self.market)
 
         self.localID += 1
         localID = str(self.localID)
@@ -407,4 +437,3 @@ class BinanceTradeApi(vnbinance.TradeApi):
             self.cancelOrder(systemID, coin, self.market)
         else:
             self.cancelDict[localID] = req
-
