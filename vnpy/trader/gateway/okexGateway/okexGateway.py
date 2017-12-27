@@ -335,6 +335,16 @@ class Api(vnokex.OkExApi):
             self.cbDict['ok_sub_spot_%s_depth_20' % (spotSymbolMapReverse[symbol])] = self.onDepth
             self.cbDict['ok_spot_%s_balance' % (spotSymbolMapReverse[symbol])] = self.onSpotSubUserInfo
             self.cbDict['ok_spot_%s_order' % (spotSymbolMapReverse[symbol])] = self.onSpotSubTrades
+            contract = VtContractData()
+            contract.gatewayName = self.gatewayName
+            contract.symbol = symbol
+            contract.exchange = self.exchange
+            contract.vtSymbol = '.'.join([contract.symbol, contract.exchange])
+            contract.name = u'币币交易'
+            contract.size = 1
+            contract.priceTick = 0.001
+            contract.productClass = PRODUCT_SPOT
+            self.gateway.onContract(contract)
             self.writeLog(u'订阅合约 %s 成功' % symbol)
 
     #----------------------------------------------------------------------
@@ -355,6 +365,16 @@ class Api(vnokex.OkExApi):
             self.cbDict['ok_sub_spot_%s_depth_20' % (spotSymbolMapReverse[symbol])] = self.onDepth
             self.cbDict['ok_spot_%s_balance' % (spotSymbolMapReverse[symbol])] = self.onSpotSubUserInfo
             self.cbDict['ok_spot_%s_order' % (spotSymbolMapReverse[symbol])] = self.onSpotSubTrades
+            contract = VtContractData()
+            contract.gatewayName = self.gatewayName
+            contract.symbol = symbol
+            contract.exchange = self.exchange
+            contract.vtSymbol = '.'.join([contract.symbol, contract.exchange])
+            contract.name = u'币币交易'
+            contract.size = 1
+            contract.priceTick = 0.001
+            contract.productClass = PRODUCT_SPOT
+            self.gateway.onContract(contract)
             self.writeLog(u'订阅合约 %s 成功' % symbol)
         self.subscribedSymbols.add(subscribeReq)
 

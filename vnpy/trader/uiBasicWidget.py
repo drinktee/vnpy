@@ -755,9 +755,10 @@ class TradingWidget(QtWidgets.QFrame):
         self.spinPrice.setMinimum(0)
         self.spinPrice.setMaximum(100000)
 
-        self.spinVolume = QtWidgets.QSpinBox()
+        self.spinVolume = QtWidgets.QDoubleSpinBox()
         self.spinVolume.setMinimum(0)
-        self.spinVolume.setMaximum(1000000)
+        self.spinPrice.setDecimals(3)
+        self.spinVolume.setMaximum(100000)
 
         self.comboPriceType = QtWidgets.QComboBox()
         self.comboPriceType.addItems(self.priceTypeList)
