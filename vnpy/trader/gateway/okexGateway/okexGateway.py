@@ -281,7 +281,7 @@ class Api(vnokex.OkExApi):
     def onMessage(self, ws, evt):
         """信息推送""" 
         data = self.readData(evt)[0]
-	try:
+        try:
             channel = data['channel']
             if channel in self.cbDict:
                callback = self.cbDict[channel]
@@ -466,7 +466,7 @@ class Api(vnokex.OkExApi):
         info = rawData['info']
         funds = rawData['info']['funds']
 
-        for symbol in [self.currency, self.symbolSet]:
+        for symbol in self.currency.add(self.symbolSet):
             if symbol in funds['free'].keys():
                 pos = VtPositionData()
                 pos.gatewayName = self.gatewayName
@@ -499,7 +499,7 @@ class Api(vnokex.OkExApi):
         info = rawData['info']
         
         # 持仓信息
-        for symbol in [self.currency, self.symbolSet]:
+        for symbol in self.currency.add(self.symbolSet):
             if symbol in info['free']:
                 pos = VtPositionData()
                 pos.gatewayName = self.gatewayName

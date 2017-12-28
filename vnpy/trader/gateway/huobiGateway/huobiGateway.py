@@ -178,7 +178,7 @@ class HuobiTradeApi(vnhuobi.TradeApi):
 
         self.subscribeSet = set()    # 订阅的币种
 
-        self.subscribeSymbol = 'usdt, '
+        self.subscribeSymbol = 'usdt'
         self.localID = 0            # 本地委托号
         self.localSystemDict = {}   # key:localID, value:systemID
         self.systemLocalDict = {}   # key:systemID, value:localID
