@@ -466,12 +466,8 @@ class Api(vnokex.OkExApi):
         rawData = data['data']
         info = rawData['info']
         funds = rawData['info']['funds']
-        print 'spot user'
-        symbols = self.currency.add(self.symbolSet)
-        print symbols
 
-        for symbol in symbols:
-            print symbol
+        for symbol in (self.currency | self.symbolSet):
             if symbol in funds['free'].keys():
                 pos = VtPositionData()
                 pos.gatewayName = self.gatewayName
@@ -505,7 +501,7 @@ class Api(vnokex.OkExApi):
         info = rawData['info']
         
         # 持仓信息
-        for symbol in self.currency.add(self.symbolSet):
+        for symbol in (self.currency | self.symbolSet):
             if symbol in info['free']:
                 pos = VtPositionData()
                 pos.gatewayName = self.gatewayName
