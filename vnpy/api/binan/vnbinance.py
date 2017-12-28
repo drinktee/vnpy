@@ -1,9 +1,7 @@
 # encoding: utf-8
 import traceback
 
-import json
-import requests
-from time import time, sleep
+from time import sleep
 from Queue import Queue, Empty
 from threading import Thread
 from binance.client import Client
@@ -27,19 +25,6 @@ SYMBOL_ETHUSD = 'ETHUSDT'
 SYMBOL_LTCUSD = 'LTCUSDT'
 SYMBOL_BTCUSD = 'BTCUSDT'
 
-PERIOD_1MIN = '001'
-PERIOD_5MIN = '005'
-PERIOD_15MIN = '015'
-PERIOD_30MIN = '030'
-PERIOD_60MIN = '060'
-PERIOD_DAILY = '100'
-PERIOD_WEEKLY = '200'
-PERIOD_MONTHLY = '300'
-PERIOD_ANNUALLY = '400'
-
-# API相关定义
-HUOBI_TRADE_API = 'https://api.huobi.com/apiv3'
-
 # 功能代码
 FUNCTIONCODE_GETACCOUNTINFO = 'get_account_info'
 FUNCTIONCODE_GETORDERS = 'get_orders'
@@ -61,7 +46,6 @@ FUNCTIONCODE_GETLOANAVAILABLE = 'get_loan_available'
 FUNCTIONCODE_GETLOANS = 'get_loans'
 
 
-########################################################################
 class BinanceApi(object):
     """交易接口"""
     DEBUG = True
@@ -507,12 +491,10 @@ class DataApi(object):
         while self.active:
             for symbol, callback in self.taskList:
                 try:
-                    r = requests.get(symbol)
-                    if r.status_code == 200:
-                        data = r.json()
-                        if self.DEBUG:
-                            print(callback.__name__)
-                        callback(data)
+                    data = self.client.get_order_book(symbol)
+                    if self.DEBUG:
+                        print(callback.__name__)
+                    callback(data)
                 except:
                     traceback.print_exc()
 
@@ -520,14 +502,12 @@ class DataApi(object):
 
     def subscribeTick(self, symbol):
         """订阅实时成交数据"""
-        url = self.TICK_SYMBOL_URL[symbol]
-        task = (url, self.onTick)
+        task = (symbol, self.onTick)
         self.taskList.append(task)
 
     def subscribeQuote(self, symbol):
         """订阅实时报价数据"""
-        url = self.QUOTE_SYMBOL_URL[symbol]
-        task = (url, self.onQuote)
+        task = (symbol, self.onQuote)
         self.taskList.append(task)
 
     def subscribeDepth(self, symbol, level=0):
@@ -546,20 +526,3 @@ class DataApi(object):
     def onDepth(self, data):
         """实时深度推送"""
         print(data)
-
-    def getKline(self, symbol, period, length=0):
-        """查询K线数据"""
-        url = self.KLINE_SYMBOL_URL[symbol]
-        url = url.replace('[period]', period)
-
-        if length:
-            url = url + '?length=' + str(length)
-
-        try:
-            r = requests.get(url)
-            if r.status_code == 200:
-                data = r.json()
-                return data
-        except:
-            traceback.print_exc()
-            return None
