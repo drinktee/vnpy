@@ -178,6 +178,7 @@ class HuobiTradeApi(vnhuobi.TradeApi):
 
         self.subscribeSet = set()    # 订阅的币种
 
+        self.subscribeSymbol = 'usdt, '
         self.localID = 0            # 本地委托号
         self.localSystemDict = {}   # key:localID, value:systemID
         self.systemLocalDict = {}   # key:systemID, value:localID
@@ -202,7 +203,7 @@ class HuobiTradeApi(vnhuobi.TradeApi):
         """查询账户回调"""
         # 推送账户数据
         for e in data['data']['list']:
-            if e['currency'] == 'usdt':
+            if e['currency'] in self.symbol:
                 pass
 
 

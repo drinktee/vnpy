@@ -336,8 +336,8 @@ class Api(vnokex.OkExApi):
             self.symbolSet.add(fundsSymbolMap[symbol])
             self.cbDict['ok_sub_spot_%s_ticker' % (spotSymbolMapReverse[symbol])] = self.onTicker
             self.cbDict['ok_sub_spot_%s_depth_20' % (spotSymbolMapReverse[symbol])] = self.onDepth
-            self.cbDict['ok_spot_%s_balance' % (spotSymbolMapReverse[symbol])] = self.onSpotSubUserInfo
-            self.cbDict['ok_spot_%s_order' % (spotSymbolMapReverse[symbol])] = self.onSpotSubTrades
+            self.cbDict['ok_sub_spot_%s_balance' % (spotSymbolMapReverse[symbol])] = self.onSpotSubUserInfo
+            self.cbDict['ok_sub_spot_%s_order' % (spotSymbolMapReverse[symbol])] = self.onSpotSubTrades
             contract = VtContractData()
             contract.gatewayName = self.gatewayName
             contract.symbol = symbol
@@ -366,8 +366,8 @@ class Api(vnokex.OkExApi):
             self.symbolSet.add(fundsSymbolMap[symbol])
             self.cbDict['ok_sub_spot_%s_ticker' % (spotSymbolMapReverse[symbol])] = self.onTicker
             self.cbDict['ok_sub_spot_%s_depth_20' % (spotSymbolMapReverse[symbol])] = self.onDepth
-            self.cbDict['ok_spot_%s_balance' % (spotSymbolMapReverse[symbol])] = self.onSpotSubUserInfo
-            self.cbDict['ok_spot_%s_order' % (spotSymbolMapReverse[symbol])] = self.onSpotSubTrades
+            self.cbDict['ok_sub_spot_%s_balance' % (spotSymbolMapReverse[symbol])] = self.onSpotSubUserInfo
+            self.cbDict['ok_sub_spot_%s_order' % (spotSymbolMapReverse[symbol])] = self.onSpotSubTrades
             contract = VtContractData()
             contract.gatewayName = self.gatewayName
             contract.symbol = symbol
@@ -465,7 +465,6 @@ class Api(vnokex.OkExApi):
         rawData = data['data']
         info = rawData['info']
         funds = rawData['info']['funds']
-
 
         for symbol in [self.currency, self.symbolSet]:
             if symbol in funds['free'].keys():
