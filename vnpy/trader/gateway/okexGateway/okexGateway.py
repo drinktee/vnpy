@@ -655,7 +655,7 @@ class Api(vnokex.OkExApi):
         """委托回报"""
         print data
         rawData = data['data']
-        orderId = rawData['order_id']
+        orderId = str(rawData['order_id'])
         
         # 尽管websocket接口的委托号返回是异步的，但经过测试是
         # 符合先发现回的规律，因此这里通过queue获取之前发送的
