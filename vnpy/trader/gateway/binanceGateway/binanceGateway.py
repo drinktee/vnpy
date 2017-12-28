@@ -1,44 +1,68 @@
 # encoding: utf-8
 
 from vnpy.trader.vtGateway import *
+
 from vnpy.trader.vtFunction import getJsonPath
-
+from datetime import datetime
 from vnpy.api.binan import vnbinance
-
+import time
 import json
 
-# BTC_USD_SPOT
-
+# USD
 BTC_USD_SPOT = 'BTC_USD_SPOT'
-ETH_USD_SPOT = 'ETH_USD_SPOT'
+BTC_USD_THISWEEK = 'BTC_USD_THISWEEK'
+BTC_USD_NEXTWEEK = 'BTC_USD_NEXTWEEK'
+BTC_USD_QUARTER = 'BTC_USD_QUARTER'
+
 LTC_USD_SPOT = 'LTC_USD_SPOT'
+LTC_USD_THISWEEK = 'LTC_USD_THISWEEK'
+LTC_USD_NEXTWEEK = 'LTC_USD_NEXTWEEK'
+LTC_USD_QUARTER = 'LTC_USD_QUARTER'
+
+ETH_USD_SPOT = 'ETH_USD_SPOT'
+ETH_USD_THISWEEK = 'ETH_USD_THISWEEK'
+ETH_USD_NEXTWEEK = 'ETH_USD_NEXTWEEK'
+ETH_USD_QUARTER = 'ETH_USD_QUARTER'
+
+# BTC
+LTC_BTC_SPOT = 'LTC_BTC_SPOT'
 ETH_BTC_SPOT = 'ETH_BTC_SPOT'
 
-SYMBOL_MAP = {}
-SYMBOL_MAP['btcusdt'] = BTC_USD_SPOT
-SYMBOL_MAP['ethusdt'] = ETH_USD_SPOT
-SYMBOL_MAP['ltcusdt'] = LTC_USD_SPOT
-SYMBOL_MAP['ethbtc'] = ETH_BTC_SPOT
-SYMBOL_MAP_REVERSE = {v: k for k, v in SYMBOL_MAP.items()}
+# 价格类型映射
+priceTypeMap = {}
+priceTypeMap['BUY'] = (DIRECTION_LONG, PRICETYPE_LIMITPRICE)
+priceTypeMap['buy_market'] = (DIRECTION_LONG, PRICETYPE_MARKETPRICE)
+priceTypeMap['SELL'] = (DIRECTION_SHORT, PRICETYPE_LIMITPRICE)
+priceTypeMap['sell_market'] = (DIRECTION_SHORT, PRICETYPE_MARKETPRICE)
+priceTypeMapReverse = {v: k for k, v in priceTypeMap.items()}
 
-DIRECTION_MAP = {}
-DIRECTION_MAP[1] = DIRECTION_LONG
-DIRECTION_MAP[2] = DIRECTION_SHORT
+# 印射字典
+spotSymbolMap = {}
+spotSymbolMap['LTCUSDT'] = LTC_USD_SPOT
+spotSymbolMap['BTCUSDT'] = BTC_USD_SPOT
+spotSymbolMap['ETHUSDT'] = ETH_USD_SPOT
+spotSymbolMap['LTCBTC'] = LTC_BTC_SPOT
+spotSymbolMap['ETHBTC'] = ETH_BTC_SPOT
+spotSymbolMapReverse = {v: k for k, v in spotSymbolMap.items()}
 
-STATUS_MAP = {}
-STATUS_MAP[0] = STATUS_NOTTRADED
-STATUS_MAP[1] = STATUS_PARTTRADED
-STATUS_MAP[2] = STATUS_ALLTRADED
-STATUS_MAP[3] = STATUS_CANCELLED
-STATUS_MAP[5] = STATUS_UNKNOWN
-STATUS_MAP[7] = STATUS_UNKNOWN
+# 委托状态印射
+statusMap = {}
+statusMap['CANCELED'] = STATUS_CANCELLED
+statusMap['NEW'] = STATUS_NOTTRADED
+statusMap['PARTIALLY_FILLED'] = STATUS_PARTTRADED
+statusMap['FILLED'] = STATUS_ALLTRADED
+statusMap['REJECTED'] = STATUS_REJECTED
+statusMap['EXPIRED'] = STATUS_UNKNOWN
+statusMap['PENDING_CANCEL'] = STATUS_UNKNOWN
 
 
 class BinanceGateway(VtGateway):
-    def __init__(self, eventEngine, gatewayName):
+    def __init__(self, eventEngine, gatewayName='Binance'):
         super(BinanceGateway, self).__init__(eventEngine, gatewayName)
         self.market = 'USDT'
         self.tradeApi = BinanceTradeApi(self)
+        self.dataApi = BinanceDataApi(self)
+
         self.fileName = self.gatewayName + '_connect.json'
         self.filePath = getJsonPath(self.fileName, __file__)
 
@@ -69,11 +93,11 @@ class BinanceGateway(VtGateway):
             self.onLog(log)
             return
 
-            # 初始化接口
+        # 初始化接口
         self.tradeApi.connect(accessKey, secretKey, market, debug)
         self.writeLog(u'交易接口初始化成功')
 
-        self.dataApi.connect(interval, market, debug)
+        self.dataApi.connect(accessKey, secretKey, interval, market, debug)
         self.writeLog(u'行情接口初始化成功')
 
         # 启动查询
@@ -88,8 +112,8 @@ class BinanceGateway(VtGateway):
         self.onLog(log)
 
     def subscribe(self, subscribeReq):
-        """订阅行情，自动订阅全部行情，无需实现"""
-        pass
+        """订阅行情"""
+        self.dataApi.subscribe(subscribeReq.symbol)
 
     def sendOrder(self, orderReq):
         """发单"""
@@ -129,13 +153,12 @@ class BinanceGateway(VtGateway):
         """启动连续查询"""
         self.eventEngine.register(EVENT_TIMER, self.query)
 
-    # ----------------------------------------------------------------------
     def setQryEnabled(self, qryEnabled):
         """设置是否要启动循环查询"""
         self.qryEnabled = qryEnabled
 
 
-class BinanceTradeApi(vnbinance.TradeApi):
+class BinanceTradeApi(vnbinance.BinanceApi):
     """交易接口"""
 
     def __init__(self, gateway):
@@ -167,58 +190,28 @@ class BinanceTradeApi(vnbinance.TradeApi):
     def onGetAccountInfo(self, data, req, reqID):
         """查询账户回调"""
         # 推送账户数据
-        for e in data['data']['list']:
-            if e['currency'] == 'usdt':
-                pass
+        balanceUsdt = 0.0
+        for balance in data['balances']:
+            symbol = balance['asset']
+            if symbol == 'USDT':
+                balanceUsdt = float(balance['free'])
+            if symbol in [self.currency, self.symbolSet]:
+                pos = VtPositionData()
+                pos.gatewayName = self.gatewayName
+                pos.symbol = symbol
+                pos.vtSymbol = symbol
+                pos.vtPositionName = symbol
+                pos.direction = DIRECTION_NET
+                pos.frozen = float(balance['locked'])
+                pos.position = pos.frozen + float(balance['free'])
+                self.gateway.onPosition(pos)
 
         account = VtAccountData()
         account.gatewayName = self.gatewayName
-        account.accountID = 'HUOBI'
-        account.vtAccountID = '.'.join([account.accountID, self.gatewayName])
-        account.balance = data['net_asset']
+        account.accountID = self.gatewayName
+        account.vtAccountID = account.accountID
+        account.balance = balanceUsdt
         self.gateway.onAccount(account)
-
-        # 推送持仓数据
-        if self.market == 'cny':
-            posCny = VtPositionData()
-            posCny.gatewayName = self.gatewayName
-            posCny.symbol = 'CNY'
-            posCny.exchange = EXCHANGE_HUOBI
-            posCny.vtSymbol = '.'.join([posCny.symbol, posCny.exchange])
-            posCny.vtPositionName = posCny.vtSymbol
-            posCny.position = data['available_cny_display']
-            posCny.frozen = data['frozen_cny_display']
-            self.gateway.onPosition(posCny)
-
-            posLtc = VtPositionData()
-            posLtc.gatewayName = self.gatewayName
-            posLtc.symbol = 'LTC'
-            posLtc.exchange = EXCHANGE_HUOBI
-            posLtc.vtSymbol = '.'.join([posLtc.symbol, posLtc.exchange])
-            posLtc.vtPositionName = posLtc.vtSymbol
-            posLtc.position = data['available_ltc_display']
-            posLtc.frozen = data['frozen_ltc_display']
-            self.gateway.onPosition(posLtc)
-        else:
-            posUsd = VtPositionData()
-            posUsd.gatewayName = self.gatewayName
-            posUsd.symbol = 'USD'
-            posUsd.exchange = EXCHANGE_HUOBI
-            posUsd.vtSymbol = '.'.join([posUsd.symbol, posUsd.exchange])
-            posUsd.vtPositionName = posUsd.vtSymbol
-            posUsd.position = data['available_usd_display']
-            posUsd.frozen = data['frozen_usd_display']
-            self.gateway.onPosition(posUsd)
-
-        posBtc = VtPositionData()
-        posBtc.gatewayName = self.gatewayName
-        posBtc.symbol = 'BTC'
-        posBtc.exchange = EXCHANGE_HUOBI
-        posBtc.vtSymbol = '.'.join([posBtc.symbol, posBtc.exchange])
-        posBtc.vtPositionName = posBtc.vtSymbol
-        posBtc.position = data['available_btc_display']
-        posBtc.frozen = data['frozen_btc_display']
-        self.gateway.onPosition(posBtc)
 
     def onGetOrders(self, data, req, reqID):
         """查询委托回调"""
@@ -227,11 +220,9 @@ class BinanceTradeApi(vnbinance.TradeApi):
             order.gatewayName = self.gatewayName
 
             # 合约代码
-            params = req['params']
-            coin = params['coin_type']
-            order.symbol = SYMBOL_MAP[(coin, self.market)]
+            order.symbol = d['symbol']
             order.exchange = EXCHANGE_BINANCE
-            order.vtSymbol = '.'.join([order.symbol, order.exchange])
+            order.vtSymbol = order.symbol
 
             # 委托号
             systemID = d['orderId']
@@ -240,36 +231,31 @@ class BinanceTradeApi(vnbinance.TradeApi):
             self.systemLocalDict[systemID] = localID
             self.localSystemDict[localID] = systemID
             order.orderID = localID
-            order.vtOrderID = '.'.join([order.orderID, order.gatewayName])
+            order.vtOrderID = '.'.join([self.gatewayName, order.orderID])
 
             # 其他信息
-            order.direction = DIRECTION_MAP[d['type']]
-            order.offset = OFFSET_NONE
+            order.direction = priceTypeMap[d['side']]
             order.price = float(d['price'])
             order.totalVolume = float(d['origQty'])
             order.tradedVolume = float(d['executedQty'])
             order.orderTime = d['time']
 
             # 委托状态
-            if order.tradedVolume == 0:
-                order.status = STATUS_NOTTRADED
-            else:
-                order.status = STATUS_PARTTRADED
+            order.status = statusMap[d['status']]
 
-            # 缓存病推送
             self.workingOrderDict[localID] = order
             self.gateway.onOrder(order)
 
     def onOrderInfo(self, data, req, reqID):
         """委托详情回调"""
-        systemID = data['id']
+        systemID = data['orderId']
         localID = self.systemLocalDict[systemID]
         order = self.workingOrderDict.get(localID, None)
         if not order:
             return
 
         # 记录最新成交的金额
-        newTradeVolume = float(data['processed_amount']) - order.tradedVolume
+        newTradeVolume = float(data['executedQty']) - order.tradedVolume
         if newTradeVolume:
             trade = VtTradeData()
             trade.gatewayName = self.gatewayName
@@ -278,10 +264,10 @@ class BinanceTradeApi(vnbinance.TradeApi):
 
             self.tradeID += 1
             trade.tradeID = str(self.tradeID)
-            trade.vtTradeID = '.'.join([trade.tradeID, trade.gatewayName])
+            trade.vtTradeID = '.'.join([self.gatewayName, trade.tradeID])
 
             trade.volume = newTradeVolume
-            trade.price = data['processed_price']
+            trade.price = data['price']
             trade.direction = order.direction
             trade.offset = order.offset
             trade.exchange = order.exchange
@@ -290,8 +276,8 @@ class BinanceTradeApi(vnbinance.TradeApi):
             self.gateway.onTrade(trade)
 
         # 更新委托状态
-        order.tradedVolume = float(data['processed_amount'])
-        order.status = STATUS_MAP.get(data['status'], STATUS_UNKNOWN)
+        order.tradedVolume = float(data['executedQty'])
+        order.status = statusMap[data['status']]
 
         if newTradeVolume:
             self.gateway.onOrder(order)
@@ -340,7 +326,7 @@ class BinanceTradeApi(vnbinance.TradeApi):
 
     def onCancelOrder(self, data, req, reqID):
         """撤单回调"""
-        if data['result'] == 'success':
+        if data['orderId'] != '':
             systemID = req['params']['id']
             localID = self.systemLocalDict[systemID]
 
@@ -358,7 +344,7 @@ class BinanceTradeApi(vnbinance.TradeApi):
         self.init(accessKey, secretKey)
 
         # 查询未成交委托
-        self.getOrders(vnbinance.COINTYPE_BTC, self.market)
+        self.getOrders()
 
     def subscribe(self, symbol):
         self.subscribeSet.add(symbol)
@@ -369,35 +355,24 @@ class BinanceTradeApi(vnbinance.TradeApi):
             # 如果尚未返回委托号，则无法查询
             if order.orderID in self.localSystemDict:
                 systemID = self.localSystemDict[order.orderID]
-                coin, market = SYMBOL_MAP_REVERSE[order.symbol]
-                self.orderInfo(systemID, coin, market)
+                symbol = order.symbol
+                self.orderInfo(systemID, symbol)
 
-    # ----------------------------------------------------------------------
     def queryAccount(self):
         """查询活动委托状态"""
         self.getAccountInfo()
 
-    # ----------------------------------------------------------------------
     def sendOrder(self, req):
         """发送委托"""
-        # 检查是否填入了价格，禁止市价委托
-        if req.priceType != PRICETYPE_LIMITPRICE:
-            err = VtErrorData()
-            err.gatewayName = self.gatewayName
-            err.errorMsg = u'火币接口仅支持限价单'
-            err.errorTime = datetime.now().strftime('%H:%M:%S')
-            self.gateway.onError(err)
-            return None
 
         # 发送限价委托
-        coin, market = SYMBOL_MAP_REVERSE[req.symbol]
+        symbol = spotSymbolMapReverse[req.symbol]
 
         if req.direction == DIRECTION_LONG:
-            reqID = self.buy(
-                req.price, req.volume, coinType=coin, market=self.market)
+            reqID = self.buy(req.price, req.volume, symbol, market=self.market)
         else:
             reqID = self.sell(
-                req.price, req.volume, coinType=coin, market=self.market)
+                req.price, req.volume, symbol, market=self.market)
 
         self.localID += 1
         localID = str(self.localID)
@@ -408,12 +383,10 @@ class BinanceTradeApi(vnbinance.TradeApi):
         order.gatewayName = self.gatewayName
 
         order.symbol = req.symbol
-        order.exchange = EXCHANGE_HUOBI
-        order.vtSymbol = '.'.join([order.symbol, order.exchange])
-
+        order.exchange = EXCHANGE_BINANCE
+        order.vtSymbol = order.symbol
         order.orderID = localID
-        order.vtOrderID = '.'.join([order.orderID, order.gatewayName])
-
+        order.vtOrderID = '.'.join([self.gatewayName, order.orderID])
         order.direction = req.direction
         order.offset = OFFSET_UNKNOWN
         order.price = req.price
@@ -427,13 +400,82 @@ class BinanceTradeApi(vnbinance.TradeApi):
         # 返回委托号
         return order.vtOrderID
 
-    # ----------------------------------------------------------------------
     def cancel(self, req):
         """撤单"""
         localID = req.orderID
         if localID in self.localSystemDict:
             systemID = self.localSystemDict[localID]
-            coin, market = SYMBOL_MAP_REVERSE[req.symbol]
-            self.cancelOrder(systemID, coin, self.market)
+            symbol = spotSymbolMapReverse[req.symbol]
+            self.cancelOrder(systemID, symbol, self.market)
         else:
             self.cancelDict[localID] = req
+
+
+class BinanceDataApi(vnbinance.DataApi):
+    """行情接口"""
+
+    def __init__(self, gateway):
+        """Constructor"""
+        super(BinanceDataApi, self).__init__()
+
+        self.market = 'USDT'
+        self.gateway = gateway
+        self.gatewayName = gateway.gatewayName
+        self.tickDict = {}  # key:symbol, value:tick
+
+    def onTick(self, data):
+        """实时成交推送"""
+        print data
+
+    def onDepth(self, data):
+        """实时深度推送"""
+        symbol = SYMBOL_MAP[data['symbol']]
+        if symbol not in self.tickDict:
+            tick = VtTickData()
+            tick.gatewayName = self.gatewayName
+
+            tick.symbol = symbol
+            tick.exchange = EXCHANGE_BINANCE
+            tick.vtSymbol = '.'.join([tick.symbol, tick.exchange])
+            self.tickDict[symbol] = tick
+        else:
+            tick = self.tickDict[symbol]
+
+        tick.bidPrice1, tick.bidVolume1 = data['bids'][0]
+        tick.bidPrice2, tick.bidVolume2 = data['bids'][1]
+        tick.bidPrice3, tick.bidVolume3 = data['bids'][2]
+        tick.bidPrice4, tick.bidVolume4 = data['bids'][3]
+        tick.bidPrice5, tick.bidVolume5 = data['bids'][4]
+
+        tick.askPrice1, tick.askVolume1 = data['asks'][0]
+        tick.askPrice2, tick.askVolume2 = data['asks'][1]
+        tick.askPrice3, tick.askVolume3 = data['asks'][2]
+        tick.askPrice4, tick.askVolume4 = data['asks'][3]
+        tick.askPrice5, tick.askVolume5 = data['asks'][4]
+
+        now = datetime.now()
+        tick.time = now.strftime('%H:%M:%S.%f')
+        tick.date = now.strftime('%Y%m%d')
+
+        self.gateway.onTick(tick)
+
+    def subscribe(self, symbol):
+        """订阅行情信息"""
+        _symbol = spotSymbolMapReverse[symbol]
+        self.subscribeDepth(_symbol)
+
+        contract = VtContractData()
+        contract.gatewayName = self.gatewayName
+        contract.symbol = symbol
+        contract.exchange = EXCHANGE_BINANCE
+        contract.vtSymbol = '.'.join([contract.symbol, contract.exchange])
+        contract.name = u'币币交易'
+        contract.size = 1
+        contract.priceTick = 0.000001
+        contract.productClass = PRODUCT_SPOT
+        self.gateway.onContract(contract)
+
+    def connect(self, accessKey, secretKey, interval, market, debug=False):
+        """连接服务器"""
+        self.market = market
+        self.init(accessKey, secretKey, interval, debug)

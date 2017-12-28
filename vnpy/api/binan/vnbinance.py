@@ -1,7 +1,4 @@
 # encoding: utf-8
-
-import urllib
-import hashlib
 import traceback
 
 import json
@@ -26,8 +23,8 @@ LOANTYPE_USD = 4
 MARKETTYPE_CNY = 'cny'
 MARKETTYPE_USD = 'usd'
 
-SYMBOL_BTCCNY = 'BTC_CNY'
-SYMBOL_LTCCNY = 'LTC_CNY'
+SYMBOL_ETHUSD = 'ETHUSDT'
+SYMBOL_LTCUSD = 'LTCUSDT'
 SYMBOL_BTCUSD = 'BTCUSDT'
 
 PERIOD_1MIN = '001'
@@ -65,7 +62,7 @@ FUNCTIONCODE_GETLOANS = 'get_loans'
 
 
 ########################################################################
-class TradeApi(object):
+class BinanceApi(object):
     """交易接口"""
     DEBUG = True
 
@@ -73,24 +70,87 @@ class TradeApi(object):
         """Constructor"""
         self.accessKey = ''
         self.secretKey = ''
+        self.currency = {'USDT', 'BTC', 'ETH'}
+        self.symbolSet = set()
         self.client = Client('', '')
         self.active = False  # API工作状态   
         self.reqID = 0  # 请求编号
         self.reqQueue = Queue()  # 请求队列
-        self.reqThread = Thread(target=self.processQueue)  #请求处理线程       
+        self.reqThread = Thread(target=self.processQueue)  # 请求处理线程       
 
     def processRequest(self, req):
         """处理请求"""
         # 读取方法和参数
         method = req['method']
         reqID = req['reqID']
+        params = req['params']
         # 发送请求
+
+        # 查询委托
         if method == FUNCTIONCODE_GETORDERS:
             try:
-                r = self.client.get_open_orders(symbol=SYMBOL_BTCUSD)
+                symbol = params['symbol']
+                if symbol != '':
+                    r = self.client.get_open_orders(symbol)
+                else:
+                    r = self.client.get_open_orders()
                 return r.json()
             except Exception as err:
-                print err
+                self.onError(err, req, reqID)
+                return None
+
+        # 查询账户
+        if method == FUNCTIONCODE_GETACCOUNTINFO:
+            try:
+                r = self.client.get_account()
+                return r.json()
+            except Exception as err:
+                self.onError(err, req, reqID)
+                return None
+
+        # 获取委托详情
+        if method == FUNCTIONCODE_ORDERINFO:
+            try:
+                symbol = params['symbol']
+                orderid = params['id']
+                r = self.client.get_order(symbol, orderid)
+                return r.json()
+            except Exception as err:
+                self.onError(err, req, reqID)
+                return None
+
+        # 撤销委托
+        if method == FUNCTIONCODE_CANCELORDER:
+            try:
+                symbol = params['symbol']
+                orderid = params['id']
+                r = self.client.cancel_order(symbol, orderid)
+                return r.json()
+            except Exception as err:
+                self.onError(err, req, reqID)
+                return None
+
+        # 委托买入
+        if method == FUNCTIONCODE_BUY:
+            try:
+                symbol = params['symbol']
+                price = params['price']
+                amount = params['amount']
+                r = self.client.order_limit_buy(symbol, amount, price)
+                return r.json()
+            except Exception as err:
+                self.onError(err, req, reqID)
+                return None
+
+        # 委托卖出
+        if method == FUNCTIONCODE_SELL:
+            try:
+                symbol = params['symbol']
+                price = params['price']
+                amount = params['amount']
+                r = self.client.order_limit_sell(symbol, amount, price)
+                return r.json()
+            except Exception as err:
                 self.onError(err, req, reqID)
                 return None
 
@@ -111,7 +171,6 @@ class TradeApi(object):
             except Empty:
                 pass
 
-    #----------------------------------------------------------------------
     def sendRequest(self, method, params, callback, optional=None):
         """发送请求"""
         # 请求编号加1
@@ -137,7 +196,6 @@ class TradeApi(object):
         self.active = True
         self.reqThread.start()
 
-    #----------------------------------------------------------------------
     def exit(self):
         """退出"""
         self.active = False
@@ -145,8 +203,7 @@ class TradeApi(object):
         if self.reqThread.isAlive():
             self.reqThread.join()
 
-    #----------------------------------------------------------------------
-    def getAccountInfo(self, market='cny'):
+    def getAccountInfo(self, market='USDT'):
         """查询账户"""
         method = FUNCTIONCODE_GETACCOUNTINFO
         params = {}
@@ -154,35 +211,32 @@ class TradeApi(object):
         optional = {'market': market}
         return self.sendRequest(method, params, callback, optional)
 
-    #----------------------------------------------------------------------
-    def getOrders(self, coinType=COINTYPE_BTC, market='USDT'):
+    def getOrders(self, symbol='', market='USDT'):
         """查询委托"""
         method = FUNCTIONCODE_GETORDERS
-        params = {'coin_type': coinType}
+        params = {'symbol': symbol}
         callback = self.onGetOrders
         optional = {'market': market}
         return self.sendRequest(method, params, callback, optional)
 
-    #----------------------------------------------------------------------
-    def orderInfo(self, id_, coinType=COINTYPE_BTC, market='cny'):
+    def orderInfo(self, id_, symbol='', market='USDT'):
         """获取委托详情"""
         method = FUNCTIONCODE_ORDERINFO
-        params = {'coin_type': coinType, 'id': id_}
+        params = {'symbol': symbol, 'id': id_}
         callback = self.onOrderInfo
         optional = {'market': market}
         return self.sendRequest(method, params, callback, optional)
 
-    #----------------------------------------------------------------------
     def buy(self,
             price,
             amount,
-            coinType=COINTYPE_BTC,
+            symbol='',
             tradePassword='',
             tradeId='',
-            market='cny'):
+            market='USDT'):
         """委托买入"""
         method = FUNCTIONCODE_BUY
-        params = {'coin_type': coinType, 'price': price, 'amount': amount}
+        params = {'symbol': symbol, 'price': price, 'amount': amount}
         callback = self.onBuy
         optional = {
             'trade_password': tradePassword,
@@ -191,17 +245,16 @@ class TradeApi(object):
         }
         return self.sendRequest(method, params, callback, optional)
 
-    #----------------------------------------------------------------------
     def sell(self,
              price,
              amount,
-             coinType=COINTYPE_BTC,
+             symbol='',
              tradePassword='',
              tradeId='',
              market='cny'):
         """委托卖出"""
         method = FUNCTIONCODE_SELL
-        params = {'coin_type': coinType, 'price': price, 'amount': amount}
+        params = {'symbol': symbol, 'price': price, 'amount': amount}
         callback = self.onSell
         optional = {
             'trade_password': tradePassword,
@@ -210,7 +263,6 @@ class TradeApi(object):
         }
         return self.sendRequest(method, params, callback, optional)
 
-    #----------------------------------------------------------------------
     def buyMarket(self,
                   amount,
                   coinType=COINTYPE_BTC,
@@ -228,7 +280,6 @@ class TradeApi(object):
         }
         return self.sendRequest(method, params, callback, optional)
 
-    #----------------------------------------------------------------------
     def sellMarket(self,
                    amount,
                    coinType=COINTYPE_BTC,
@@ -246,16 +297,14 @@ class TradeApi(object):
         }
         return self.sendRequest(method, params, callback, optional)
 
-    #----------------------------------------------------------------------
-    def cancelOrder(self, id_, coinType=COINTYPE_BTC, market='cny'):
+    def cancelOrder(self, id_, symbol='', market='USDT'):
         """撤销委托"""
         method = FUNCTIONCODE_CANCELORDER
-        params = {'coin_type': coinType, 'id': id_}
+        params = {'symbol': symbol, 'id': id_}
         callback = self.onCancelOrder
         optional = {'market': market}
         return self.sendRequest(method, params, callback, optional)
 
-    #----------------------------------------------------------------------
     def getNewDealOrders(self, market='cny'):
         """查询最新10条成交"""
         method = FUNCTIONCODE_GETNEWDEALORDERS
@@ -264,7 +313,6 @@ class TradeApi(object):
         optional = {'market': market}
         return self.sendRequest(method, params, callback, optional)
 
-    #----------------------------------------------------------------------
     def getOrderIdByTradeId(self, tradeId, coinType=COINTYPE_BTC,
                             market='cny'):
         """通过成交编号查询委托编号"""
@@ -274,7 +322,6 @@ class TradeApi(object):
         optional = {'market': market}
         return self.sendRequest(method, params, callback, optional)
 
-    #----------------------------------------------------------------------
     def withdrawCoin(self,
                      withdrawAddress,
                      withdrawAmount,
@@ -293,7 +340,6 @@ class TradeApi(object):
         optional = {'market': market, 'withdraw_fee': withdrawFee}
         return self.sendRequest(method, params, callback, optional)
 
-    #----------------------------------------------------------------------
     def cancelWithdrawCoin(self, id_, market='cny'):
         """取消提币"""
         method = FUNCTIONCODE_CANCELWITHDRAWCOIN
@@ -302,7 +348,6 @@ class TradeApi(object):
         optional = {'market': market}
         return self.sendRequest(method, params, callback, optional)
 
-    #----------------------------------------------------------------------
     def onGetWithdrawCoinResult(self, id_, market='cny'):
         """查询提币结果"""
         method = FUNCTIONCODE_GETWITHDRAWCOINRESULT
@@ -311,7 +356,6 @@ class TradeApi(object):
         optional = {'market': market}
         return self.sendRequest(method, params, callback, optional)
 
-    #----------------------------------------------------------------------
     def transfer(self, amountFrom, amountTo, amount, coinType=COINTYPE_BTC):
         """账户内转账"""
         method = FUNCTIONCODE_TRANSFER
@@ -325,7 +369,6 @@ class TradeApi(object):
         optional = {}
         return self.sendRequest(method, params, callback, optional)
 
-    #----------------------------------------------------------------------
     def loan(self, amount, loan_type=LOANTYPE_CNY, market=MARKETTYPE_CNY):
         """申请杠杆"""
         method = FUNCTIONCODE_LOAN
@@ -334,7 +377,6 @@ class TradeApi(object):
         optional = {'market': market}
         return self.sendRequest(method, params, callback, optional)
 
-    #----------------------------------------------------------------------
     def repayment(self, id_, amount, repayAll=0, market=MARKETTYPE_CNY):
         """归还杠杆"""
         method = FUNCTIONCODE_REPAYMENT
@@ -343,7 +385,6 @@ class TradeApi(object):
         optional = {'repay_all': repayAll, 'market': market}
         return self.sendRequest(method, params, callback, optional)
 
-    #----------------------------------------------------------------------
     def getLoanAvailable(self, market='cny'):
         """查询杠杆额度"""
         method = FUNCTIONCODE_GETLOANAVAILABLE
@@ -352,7 +393,6 @@ class TradeApi(object):
         optional = {'market': market}
         return self.sendRequest(method, params, callback, optional)
 
-    #----------------------------------------------------------------------
     def getLoans(self, market='cny'):
         """查询杠杆列表"""
         method = FUNCTIONCODE_GETLOANS
@@ -361,101 +401,74 @@ class TradeApi(object):
         optional = {'market': market}
         return self.sendRequest(method, params, callback, optional)
 
-    ####################################################
-    ## 回调函数
-    ####################################################
-
-    #----------------------------------------------------------------------
     def onError(self, error, req, reqID):
         """错误推送"""
         print(error, reqID)
 
-    #----------------------------------------------------------------------
     def onGetAccountInfo(self, data, req, reqID):
         """查询账户回调"""
         print(data)
 
-    #----------------------------------------------------------------------
     def onGetOrders(self, data, req, reqID, fuck):
         """查询委托回调"""
         print(data)
 
-    #----------------------------------------------------------------------
     def onOrderInfo(self, data, req, reqID):
         """委托详情回调"""
         print(data)
 
-    #----------------------------------------------------------------------
     def onBuy(self, data, req, reqID):
         """买入回调"""
         print(data)
 
-    #----------------------------------------------------------------------
     def onSell(self, data, req, reqID):
         """卖出回调"""
         print(data)
 
-    #----------------------------------------------------------------------
     def onBuyMarket(self, data, req, reqID):
         """市价买入回调"""
         print(data)
 
-    #----------------------------------------------------------------------
     def onSellMarket(self, data, req, reqID):
         """市价卖出回调"""
         print(data)
 
-    #----------------------------------------------------------------------
     def onCancelOrder(self, data, req, reqID):
         """撤单回调"""
         print(data)
 
-    #----------------------------------------------------------------------
     def onGetNewDealOrders(self, data, req, reqID):
         """查询最新成交回调"""
         print(data)
 
-    #----------------------------------------------------------------------
     def onGetOrderIdByTradeId(self, data, req, reqID):
         """通过成交编号查询委托编号回调"""
         print(data)
 
-    #----------------------------------------------------------------------
     def onWithdrawCoin(self, data, req, reqID):
         """提币回调"""
         print(data)
 
-    #----------------------------------------------------------------------
     def onCancelWithdrawCoin(self, data, req, reqID):
         """取消提币回调"""
         print(data)
 
-    #----------------------------------------------------------------------
-    def onGetWithdrawCoinResult(self, data, req, reqID):
-        """查询提币结果回调"""
-        print(data)
-
-    #----------------------------------------------------------------------
     def onTransfer(self, data, req, reqID):
         """转账回调"""
         print(data)
 
-    #----------------------------------------------------------------------
     def onLoan(self, data, req, reqID):
         """申请杠杆回调"""
         print(data)
 
-    #----------------------------------------------------------------------
     def onRepayment(self, data, req, reqID):
         """归还杠杆回调"""
         print(data)
 
-    #----------------------------------------------------------------------
     def onLoanAvailable(self, data, req, reqID):
         """查询杠杆额度回调"""
         print(data)
 
-    #----------------------------------------------------------------------
     def onGetLoans(self, data, req, reqID):
         """查询杠杆列表"""
         print(data)
@@ -464,54 +477,24 @@ class TradeApi(object):
 ########################################################################
 class DataApi(object):
     """行情接口"""
-    TICK_SYMBOL_URL = {
-        SYMBOL_BTCCNY: 'http://api.huobi.com/staticmarket/detail_btc_json.js',
-        SYMBOL_LTCCNY: 'http://api.huobi.com/staticmarket/detail_ltc_json.js',
-        SYMBOL_BTCUSD: 'http://api.huobi.com/usdmarket/detail_btc_json.js'
-    }
-
-    QUOTE_SYMBOL_URL = {
-        SYMBOL_BTCCNY: 'http://api.huobi.com/staticmarket/ticker_btc_json.js',
-        SYMBOL_LTCCNY: 'http://api.huobi.com/staticmarket/ticker_ltc_json.js',
-        SYMBOL_BTCUSD: 'http://api.huobi.com/usdmarket/ticker_btc_json.js'
-    }
-
-    DEPTH_SYMBOL_URL = {
-        SYMBOL_BTCCNY: 'http://api.huobi.com/staticmarket/depth_btc_json.js',
-        SYMBOL_LTCCNY: 'http://api.huobi.com/staticmarket/depth_ltc_json.js',
-        SYMBOL_BTCUSD: 'http://api.huobi.com/usdmarket/depth_btc_json.js'
-    }
-
-    KLINE_SYMBOL_URL = {
-        SYMBOL_BTCCNY:
-        'http://api.huobi.com/staticmarket/btc_kline_[period]_json.js',
-        SYMBOL_LTCCNY:
-        'http://api.huobi.com/staticmarket/btc_kline_[period]_json.js',
-        SYMBOL_BTCUSD:
-        'http://api.huobi.com/usdmarket/btc_kline_[period]_json.js'
-    }
-
     DEBUG = True
 
-    #----------------------------------------------------------------------
     def __init__(self):
         """Constructor"""
         self.active = False
-
         self.taskInterval = 0  # 每轮请求延时
         self.taskList = []  # 订阅的任务列表
+        self.client = Client('', '')
         self.taskThread = Thread(target=self.run)  # 处理任务的线程
 
-    #----------------------------------------------------------------------
-    def init(self, interval, debug):
+    def init(self, accessKey, secretKey, interval, debug):
         """初始化"""
         self.taskInterval = interval
         self.DEBUG = debug
-
+        self.client = Client(accessKey, secretKey)
         self.active = True
         self.taskThread.start()
 
-    #----------------------------------------------------------------------
     def exit(self):
         """退出"""
         self.active = False
@@ -519,13 +502,12 @@ class DataApi(object):
         if self.taskThread.isAlive():
             self.taskThread.join()
 
-    #----------------------------------------------------------------------
     def run(self):
         """连续运行"""
         while self.active:
-            for url, callback in self.taskList:
+            for symbol, callback in self.taskList:
                 try:
-                    r = requests.get(url)
+                    r = requests.get(symbol)
                     if r.status_code == 200:
                         data = r.json()
                         if self.DEBUG:
@@ -536,47 +518,35 @@ class DataApi(object):
 
             sleep(self.taskInterval)
 
-    #----------------------------------------------------------------------
     def subscribeTick(self, symbol):
         """订阅实时成交数据"""
         url = self.TICK_SYMBOL_URL[symbol]
         task = (url, self.onTick)
         self.taskList.append(task)
 
-    #----------------------------------------------------------------------
     def subscribeQuote(self, symbol):
         """订阅实时报价数据"""
         url = self.QUOTE_SYMBOL_URL[symbol]
         task = (url, self.onQuote)
         self.taskList.append(task)
 
-    #----------------------------------------------------------------------
     def subscribeDepth(self, symbol, level=0):
         """订阅深度数据"""
-        url = self.DEPTH_SYMBOL_URL[symbol]
-
-        if level:
-            url = url.replace('json', str(level))
-
-        task = (url, self.onDepth)
+        task = (symbol, self.onDepth)
         self.taskList.append(task)
 
-    #----------------------------------------------------------------------
     def onTick(self, data):
         """实时成交推送"""
         print(data)
 
-    #----------------------------------------------------------------------
     def onQuote(self, data):
         """实时报价推送"""
         print(data)
 
-    #----------------------------------------------------------------------
     def onDepth(self, data):
         """实时深度推送"""
         print(data)
 
-    #----------------------------------------------------------------------
     def getKline(self, symbol, period, length=0):
         """查询K线数据"""
         url = self.KLINE_SYMBOL_URL[symbol]
