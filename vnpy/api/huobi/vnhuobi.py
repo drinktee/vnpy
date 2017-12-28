@@ -220,6 +220,7 @@ class TradeApi(object):
         self.accessKey = ''
         self.secretKey = ''
 
+
         self.account_id = None
         self.active = False         # API工作状态   
         self.reqID = 0              # 请求编号
@@ -342,16 +343,12 @@ class TradeApi(object):
     #----------------------------------------------------------------------
     def getBalance(self):
         """查询余额"""
-        if self.account_id is None:
-            self.getAccountInfo()
-            return
-
-        http_method = 'GET'
-        method = FUNCTIONCODE_GEBANLANCE % self.account_id
-        params = {}
-        callback = self.onGetBalance
-        return self.sendRequest(http_method, method, params, callback)
-
+        if self.account_id:
+            http_method = 'GET'
+            method = FUNCTIONCODE_GEBANLANCE % self.account_id
+            params = {}
+            callback = self.onGetBalance
+            return self.sendRequest(http_method, method, params, callback)
 
     #----------------------------------------------------------------------
     def buy(self, price, amount, symbol):
@@ -437,6 +434,7 @@ class TradeApi(object):
     def onGetAccountInfo(self, data, req, reqID):
         """查询账户回调"""
         self.account_id = data['data'][0]['id']
+        self.getBalance()
         print data
 
     #----------------------------------------------------------------------

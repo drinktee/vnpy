@@ -686,7 +686,8 @@ class TradingWidget(QtWidgets.QFrame):
                     EXCHANGE_NYMEX,
                     EXCHANGE_LME,
                     EXCHANGE_GLOBEX,
-                    EXCHANGE_IDEALPRO]
+                    EXCHANGE_IDEALPRO,
+                    EXCHANGE_OKEX]
     
     currencyList = [CURRENCY_NONE,
                     CURRENCY_CNY,
@@ -754,9 +755,10 @@ class TradingWidget(QtWidgets.QFrame):
         self.spinPrice.setMinimum(0)
         self.spinPrice.setMaximum(100000)
 
-        self.spinVolume = QtWidgets.QSpinBox()
+        self.spinVolume = QtWidgets.QDoubleSpinBox()
         self.spinVolume.setMinimum(0)
-        self.spinVolume.setMaximum(1000000)
+        self.spinPrice.setDecimals(3)
+        self.spinVolume.setMaximum(100000)
 
         self.comboPriceType = QtWidgets.QComboBox()
         self.comboPriceType.addItems(self.priceTypeList)
@@ -927,7 +929,7 @@ class TradingWidget(QtWidgets.QFrame):
             gatewayName = contract.gatewayName
             self.lineName.setText(contract.name)
             exchange = contract.exchange    # 保证有交易所代码
-            
+
         # 清空价格数量
         self.spinPrice.setValue(0)
         self.spinVolume.setValue(0)
@@ -979,7 +981,6 @@ class TradingWidget(QtWidgets.QFrame):
     def updateTick(self, event):
         """更新行情"""
         tick = event.dict_['data']
-
         if tick.vtSymbol == self.symbol:
             if not self.checkFixed.isChecked():
                 self.spinPrice.setValue(tick.lastPrice)

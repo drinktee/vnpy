@@ -172,13 +172,10 @@ class OkexGateway(VtGateway):
         self.initQuery()
         self.startQuery()
 
-
-
-    
     #----------------------------------------------------------------------
     def subscribe(self, subscribeReq):
         """订阅行情"""
-        self.api.subscribe(subscribeReq.symbol)
+        self.api.subscribe(subscribeReq)
         
     #----------------------------------------------------------------------
     def sendOrder(self, orderReq):
@@ -259,8 +256,10 @@ class Api(vnokex.OkExApi):
         
         self.gateway = gateway                  # gateway对象
         self.gatewayName = gateway.gatewayName  # gateway对象名称
-        
+        self.exchange = EXCHANGE_OKEX
+
         self.active = False             # 若为True则会在断线后自动重连
+        self.subscribedSymbols = set()  # 已经订阅的产品
 
         self.symbolSet = set()
         self.cbDict = {}
@@ -279,10 +278,14 @@ class Api(vnokex.OkExApi):
     def onMessage(self, ws, evt):
         """信息推送""" 
         data = self.readData(evt)[0]
-        channel = data['channel']
-        if channel in self.cbDict:
-            callback = self.cbDict[channel]
-            callback(data)
+        try:
+            channel = data['channel']
+            if channel in self.cbDict:
+               callback = self.cbDict[channel]
+               callback(data)
+        except Exception, e:
+            print e
+            print data
         
     #----------------------------------------------------------------------
     def onError(self, ws, evt):
@@ -325,6 +328,26 @@ class Api(vnokex.OkExApi):
         self.login()
         self.spotUserInfo()
 
+        for subscribeReq in self.subscribedSymbols:
+            symbol = subscribeReq.symbol
+            self.subscribeSpotDepth(spotSymbolMapReverse[symbol], DEPTH_20)
+            self.symbolSet.add(fundsSymbolMap[symbol])
+            self.cbDict['ok_sub_spot_%s_ticker' % (spotSymbolMapReverse[symbol])] = self.onTicker
+            self.cbDict['ok_sub_spot_%s_depth_20' % (spotSymbolMapReverse[symbol])] = self.onDepth
+            self.cbDict['ok_sub_spot_%s_balance' % (spotSymbolMapReverse[symbol])] = self.onSpotSubUserInfo
+            self.cbDict['ok_sub_spot_%s_order' % (spotSymbolMapReverse[symbol])] = self.onSpotSubTrades
+            contract = VtContractData()
+            contract.gatewayName = self.gatewayName
+            contract.symbol = symbol
+            contract.exchange = self.exchange
+            contract.vtSymbol = '.'.join([contract.symbol, contract.exchange])
+            contract.name = u'币币交易'
+            contract.size = 1
+            contract.priceTick = 0.001
+            contract.productClass = PRODUCT_SPOT
+            self.gateway.onContract(contract)
+            self.writeLog(u'订阅合约 %s 成功' % symbol)
+
     #----------------------------------------------------------------------
     def writeLog(self, content):
         """快速记录日志"""
@@ -333,24 +356,31 @@ class Api(vnokex.OkExApi):
         log.logContent = content
         self.gateway.onLog(log)
 
-    def subscribe(self, symbol):
+    def subscribe(self, subscribeReq):
         """订阅行情信息"""
-        timeout = time.time() + 5
-        while True:
-            if  time.time() > timeout:
-                break
-            if self.gateway.connected is True:
-                self.subscribeSpotDepth(spotSymbolMapReverse[symbol], DEPTH_20)
-                self.symbolSet.add(fundsSymbolMap[symbol])
-                self.cbDict['ok_sub_spot_%s_ticker' % (spotSymbolMapReverse[symbol])] = self.onTicker
-                self.cbDict['ok_sub_spot_%s_depth_20' % (spotSymbolMapReverse[symbol])] = self.onDepth
-                self.cbDict['ok_spot_%s_balance' % (spotSymbolMapReverse[symbol])] = self.onSpotSubUserInfo
-                self.cbDict['ok_spot_%s_order' % (spotSymbolMapReverse[symbol])] = self.onSpotSubTrades
-                self.writeLog(u'订阅合约 %s 成功'%symbol)
-                break
-        self.writeLog(u'订阅合约超时')
+        if self.gateway.connected:
+            symbol = subscribeReq.symbol
+            self.subscribeSpotDepth(spotSymbolMapReverse[symbol], DEPTH_20)
+            self.symbolSet.add(fundsSymbolMap[symbol])
+            self.cbDict['ok_sub_spot_%s_ticker' % (spotSymbolMapReverse[symbol])] = self.onTicker
+            self.cbDict['ok_sub_spot_%s_depth_20' % (spotSymbolMapReverse[symbol])] = self.onDepth
+            self.cbDict['ok_sub_spot_%s_balance' % (spotSymbolMapReverse[symbol])] = self.onSpotSubUserInfo
+            self.cbDict['ok_sub_spot_%s_order' % (spotSymbolMapReverse[symbol])] = self.onSpotSubTrades
+            contract = VtContractData()
+            contract.gatewayName = self.gatewayName
+            contract.symbol = symbol
+            contract.exchange = self.exchange
+            contract.vtSymbol = '.'.join([contract.symbol, contract.exchange])
+            contract.name = u'币币交易'
+            contract.size = 1
+            contract.priceTick = 0.001
+            contract.productClass = PRODUCT_SPOT
+            self.gateway.onContract(contract)
+            self.writeLog(u'订阅合约 %s 成功' % symbol)
+        self.subscribedSymbols.add(subscribeReq)
 
-    #----------------------------------------------------------------------
+
+    #---------------------------------------------------------------------
     def initCallback(self):
         """初始化回调函数"""
         # USD_SPOT
@@ -372,7 +402,7 @@ class Api(vnokex.OkExApi):
         if symbol not in self.tickDict:
             tick = VtTickData()
             tick.symbol = symbol
-            tick.vtSymbol = symbol
+            tick.vtSymbol = '.'.join([symbol, self.exchange])
             tick.gatewayName = self.gatewayName
             self.tickDict[symbol] = tick
         else:
@@ -400,7 +430,7 @@ class Api(vnokex.OkExApi):
         if symbol not in self.tickDict:
             tick = VtTickData()
             tick.symbol = symbol
-            tick.vtSymbol = symbol
+            tick.vtSymbol = '.'.join([symbol, self.exchange])
             tick.gatewayName = self.gatewayName
             self.tickDict[symbol] = tick
         else:
@@ -434,14 +464,14 @@ class Api(vnokex.OkExApi):
         info = rawData['info']
         funds = rawData['info']['funds']
 
-
-        for symbol in [self.currency, self.symbolSet]:
+        for symbol in (self.currency | self.symbolSet):
             if symbol in funds['free'].keys():
                 pos = VtPositionData()
                 pos.gatewayName = self.gatewayName
 
                 pos.symbol = symbol
-                pos.vtSymbol = symbol
+                pos.vtSymbol = '.'.join([symbol, self.exchange])
+                pos.vtPositionName = symbol
                 pos.vtPositionName = symbol
                 pos.direction = DIRECTION_NET
 
@@ -468,20 +498,20 @@ class Api(vnokex.OkExApi):
         info = rawData['info']
         
         # 持仓信息
-        for symbol in [self.currency, self.symbolSet]:
+        for symbol in (self.currency | self.symbolSet):
             if symbol in info['free']:
                 pos = VtPositionData()
                 pos.gatewayName = self.gatewayName
                 
                 pos.symbol = symbol
-                pos.vtSymbol = symbol
+                pos.vtSymbol = '.'.join([symbol, self.exchange])
                 pos.vtPositionName = symbol
                 pos.direction = DIRECTION_NET
                 
                 pos.frozen = float(info['freezed'][symbol])
                 pos.position = pos.frozen + float(info['free'][symbol])
                 
-                self.gateway.onPosition(pos)  
+                self.gateway.onPosition(pos)
                 
     #----------------------------------------------------------------------
     def onSpotSubTrades(self, data):
@@ -500,7 +530,7 @@ class Api(vnokex.OkExApi):
             order.gatewayName = self.gatewayName
             
             order.symbol = spotSymbolMap[rawData['symbol']]
-            order.vtSymbol = order.symbol
+            order.vtSymbol = '.'.join([order.symbol, self.exchange])
     
             order.orderID = localNo
             order.vtOrderID = '.'.join([self.gatewayName, order.orderID])
@@ -524,7 +554,7 @@ class Api(vnokex.OkExApi):
             trade.gatewayName = self.gatewayName
             
             trade.symbol = spotSymbolMap[rawData['symbol']]
-            trade.vtSymbol = order.symbol            
+            trade.vtSymbol = '.'.join([order.symbol, self.exchange])
             
             trade.tradeID = str(rawData['id'])
             trade.vtTradeID = '.'.join([self.gatewayName, trade.tradeID])
@@ -559,7 +589,7 @@ class Api(vnokex.OkExApi):
                 order.gatewayName = self.gatewayName
                 
                 order.symbol = spotSymbolMap[d['symbol']]
-                order.vtSymbol = order.symbol
+                order.vtSymbol = '.'.join([order.symbol, self.exchange])
     
                 order.orderID = localNo
                 order.vtOrderID = '.'.join([self.gatewayName, order.orderID])
@@ -582,7 +612,7 @@ class Api(vnokex.OkExApi):
         """生成合约"""
         new = copy(contract)
         new.symbol = symbol
-        new.vtSymbol = symbol
+        new.vtSymbol = '.'.join([new.symbol, self.exchange])
         new.name = symbol
         return new
 
@@ -621,7 +651,7 @@ class Api(vnokex.OkExApi):
     def onSpotTrade(self, data):
         """委托回报"""
         rawData = data['data']
-        orderId = rawData['order_id']
+        orderId = str(rawData['order_id'])
         
         # 尽管websocket接口的委托号返回是异步的，但经过测试是
         # 符合先发现回的规律，因此这里通过queue获取之前发送的
@@ -659,7 +689,7 @@ class Api(vnokex.OkExApi):
     #----------------------------------------------------------------------
     def spotCancel(self, req):
         """撤单"""
-        symbol = spotSymbolMapReverse[req.symbol][:4]
+        symbol = spotSymbolMapReverse[req.symbol]
         localNo = req.orderID
         
         if localNo in self.localNoDict:

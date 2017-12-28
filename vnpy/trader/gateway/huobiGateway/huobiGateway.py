@@ -178,6 +178,8 @@ class HuobiTradeApi(vnhuobi.TradeApi):
 
         self.subscribeSet = set()    # 订阅的币种
 
+        self.currency = {'btc', 'usdt', 'eth'}
+        self.subscribeSymbol = set()
         self.localID = 0            # 本地委托号
         self.localSystemDict = {}   # key:localID, value:systemID
         self.systemLocalDict = {}   # key:systemID, value:localID
@@ -201,62 +203,42 @@ class HuobiTradeApi(vnhuobi.TradeApi):
     def onGetAccountInfo(self, data, req, reqID):
         """查询账户回调"""
         # 推送账户数据
+        postionDict = {}
         for e in data['data']['list']:
-            if e['currency'] == 'usdt':
-                pass
+            if e['currency'] in postionDict:
+                pos = postionDict[e['currency']]
+                if 'trade' in e:
+                    pos.position += e['balance']
+                else:
+                    pos.position += e['balance']
+                    pos.frozen += e['balance']
+            else:
+                pos = VtPositionData()
+                pos.gatewayName = self.gatewayName
+                pos.symbol = e['currency']
+                pos.exchange = EXCHANGE_HUOBI
+                pos.vtSymbol = '.'.join([pos.symbol, pos.exchange])
+                pos.vtPositionName = pos.vtSymbol
+                if 'trade' in e:
+                    pos.position = e['balance']
+                    pos.frozen = 0
+                else:
+                    pos.position = e['balance']
+                    pos.frozen = e['balance']
+                postionDict[pos.symbol] = pos
 
+        for symbol in postionDict.keys():
+            if symbol == 'usdt':
+                account = VtAccountData()
+                account.gatewayName = self.gatewayName
+                account.accountID = 'HUOBI'
+                account.vtAccountID = '.'.join([account.accountID, self.gatewayName])
+                account.balance = postionDict[symbol].position
+                self.gateway.onAccount(account)
 
-        account = VtAccountData()
-        account.gatewayName = self.gatewayName
-        account.accountID = 'HUOBI'
-        account.vtAccountID = '.'.join([account.accountID, self.gatewayName])
-        account.balance = data['net_asset']
-        self.gateway.onAccount(account)
+            if symbol in (self.currency | self.subscribeSymbol):
+                self.gateway.onPosition(postionDict[symbol])
 
-
-        
-        # 推送持仓数据
-        if self.market == 'cny':
-            posCny = VtPositionData()
-            posCny.gatewayName = self.gatewayName
-            posCny.symbol = 'CNY'
-            posCny.exchange = EXCHANGE_HUOBI
-            posCny.vtSymbol = '.'.join([posCny.symbol, posCny.exchange])
-            posCny.vtPositionName = posCny.vtSymbol
-            posCny.position = data['available_cny_display']
-            posCny.frozen = data['frozen_cny_display']
-            self.gateway.onPosition(posCny)
-            
-            posLtc = VtPositionData()
-            posLtc.gatewayName = self.gatewayName
-            posLtc.symbol = 'LTC'
-            posLtc.exchange = EXCHANGE_HUOBI
-            posLtc.vtSymbol = '.'.join([posLtc.symbol, posLtc.exchange])
-            posLtc.vtPositionName = posLtc.vtSymbol
-            posLtc.position = data['available_ltc_display']
-            posLtc.frozen = data['frozen_ltc_display']
-            self.gateway.onPosition(posLtc)
-        else:
-            posUsd = VtPositionData()
-            posUsd.gatewayName = self.gatewayName
-            posUsd.symbol = 'USD'
-            posUsd.exchange = EXCHANGE_HUOBI
-            posUsd.vtSymbol = '.'.join([posUsd.symbol, posUsd.exchange])
-            posUsd.vtPositionName = posUsd.vtSymbol
-            posUsd.position = data['available_usd_display']
-            posUsd.frozen = data['frozen_usd_display']
-            self.gateway.onPosition(posUsd)     
-            
-        posBtc = VtPositionData()
-        posBtc.gatewayName = self.gatewayName
-        posBtc.symbol = 'BTC'
-        posBtc.exchange = EXCHANGE_HUOBI
-        posBtc.vtSymbol = '.'.join([posBtc.symbol, posBtc.exchange])
-        posBtc.vtPositionName = posBtc.vtSymbol
-        posBtc.position = data['available_btc_display']
-        posBtc.frozen = data['frozen_btc_display']
-        self.gateway.onPosition(posBtc)        
-    
     #----------------------------------------------------------------------
     def onGetOrders(self, data, req, reqID):
         """查询委托回调"""
@@ -398,13 +380,14 @@ class HuobiTradeApi(vnhuobi.TradeApi):
         self.DEBUG = debug
         
         self.init(accessKey, secretKey)
+        self.getAccountInfo()
 
         # 查询未成交委托
-        self.getOrders(vnhuobi.COINTYPE_BTC, self.market)
-
-        if self.market == vnhuobi.MARKETTYPE_CNY:
-            # 只有人民币市场才有莱特币
-            self.getOrders(vnhuobi.COINTYPE_LTC, self.market)
+        # self.getOrders(vnhuobi.COINTYPE_BTC, self.market)
+        #
+        # if self.market == vnhuobi.MARKETTYPE_CNY:
+        #     # 只有人民币市场才有莱特币
+        #     self.getOrders(vnhuobi.COINTYPE_LTC, self.market)
 
     # ----------------------------------------------------------------------
     def subscribe(self, symbol):
@@ -502,7 +485,13 @@ class HuobiDataApi(vnhuobi.DataApi):
 
         self.tickDict = {}      # key:symbol, value:tick
 
-    
+    def readData(self, evt):
+        """解压缩推送收到的数据"""
+        # 通过json解析字符串
+        data = json.loads(evt)
+
+        return data
+
     #----------------------------------------------------------------------
     def onTick(self, data):
         """实时成交推送"""
@@ -511,7 +500,10 @@ class HuobiDataApi(vnhuobi.DataApi):
     #----------------------------------------------------------------------
     def onDepth(self, data):
         """实时深度推送"""
-        symbol = SYMBOL_MAP[data['symbol']]
+        data = self.readData(data)
+        data = data['tick']
+        chsymbol = data['ch'].split('.')[1]
+        symbol = SYMBOL_MAP[chsymbol]
         if symbol not in self.tickDict:
             tick = VtTickData()
             tick.gatewayName = self.gatewayName
