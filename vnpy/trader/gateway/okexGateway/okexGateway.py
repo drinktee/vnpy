@@ -286,7 +286,8 @@ class Api(vnokex.OkExApi):
             if channel in self.cbDict:
                callback = self.cbDict[channel]
                callback(data)
-        except:
+        except Exception, e:
+            print e
             print data
         
     #----------------------------------------------------------------------
@@ -465,14 +466,17 @@ class Api(vnokex.OkExApi):
         rawData = data['data']
         info = rawData['info']
         funds = rawData['info']['funds']
+        print rawData
 
         for symbol in self.currency.add(self.symbolSet):
+            print symbol
             if symbol in funds['free'].keys():
                 pos = VtPositionData()
                 pos.gatewayName = self.gatewayName
 
                 pos.symbol = symbol
                 pos.vtSymbol = '.'.join([symbol, self.exchange])
+                pos.vtPositionName = symbol
                 pos.vtPositionName = symbol
                 pos.direction = DIRECTION_NET
 
