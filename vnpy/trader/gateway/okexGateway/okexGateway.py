@@ -172,9 +172,6 @@ class OkexGateway(VtGateway):
         self.initQuery()
         self.startQuery()
 
-
-
-    
     #----------------------------------------------------------------------
     def subscribe(self, subscribeReq):
         """订阅行情"""
@@ -514,7 +511,7 @@ class Api(vnokex.OkExApi):
                 pos.frozen = float(info['freezed'][symbol])
                 pos.position = pos.frozen + float(info['free'][symbol])
                 
-                self.gateway.onPosition(pos)  
+                self.gateway.onPosition(pos)
                 
     #----------------------------------------------------------------------
     def onSpotSubTrades(self, data):
