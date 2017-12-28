@@ -519,8 +519,6 @@ class Api(vnokex.OkExApi):
     #----------------------------------------------------------------------
     def onSpotSubTrades(self, data):
         """成交和委托推送"""
-        print 'on spot trade'
-        print data
         if 'data' not in data:
             return
         rawData = data['data']
@@ -655,6 +653,7 @@ class Api(vnokex.OkExApi):
     #----------------------------------------------------------------------
     def onSpotTrade(self, data):
         """委托回报"""
+        print data
         rawData = data['data']
         orderId = rawData['order_id']
         
