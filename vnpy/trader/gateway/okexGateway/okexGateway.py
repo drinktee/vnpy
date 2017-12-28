@@ -466,9 +466,11 @@ class Api(vnokex.OkExApi):
         rawData = data['data']
         info = rawData['info']
         funds = rawData['info']['funds']
-        print rawData
+        print 'spot user'
+        symbols = self.currency.add(self.symbolSet)
+        print symbols
 
-        for symbol in self.currency.add(self.symbolSet):
+        for symbol in symbols:
             print symbol
             if symbol in funds['free'].keys():
                 pos = VtPositionData()
