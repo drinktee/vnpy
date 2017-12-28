@@ -692,7 +692,7 @@ class Api(vnokex.OkExApi):
     #----------------------------------------------------------------------
     def spotCancel(self, req):
         """撤单"""
-        symbol = spotSymbolMapReverse[req.symbol][:4]
+        symbol = spotSymbolMapReverse[req.symbol]
         localNo = req.orderID
         
         if localNo in self.localNoDict:
