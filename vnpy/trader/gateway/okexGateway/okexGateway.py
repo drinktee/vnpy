@@ -653,7 +653,6 @@ class Api(vnokex.OkExApi):
     #----------------------------------------------------------------------
     def onSpotTrade(self, data):
         """委托回报"""
-        print data
         rawData = data['data']
         orderId = str(rawData['order_id'])
         
